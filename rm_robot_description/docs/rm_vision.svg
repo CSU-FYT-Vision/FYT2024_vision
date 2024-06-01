@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Created with Vectornator (http://vectornator.io/) -->
+<svg height="100%" stroke-miterlimit="10" style="fill-rule:nonzero;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;" version="1.1" viewBox="0 0 1024 1024" width="100%" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:vectornator="http://vectornator.io" xmlns:xlink="http://www.w3.org/1999/xlink">
+<defs>
+<linearGradient gradientTransform="matrix(1 0 0 1 6.39488e-14 157.46)" gradientUnits="userSpaceOnUse" id="LinearGradient" x1="375.972" x2="944.796" y1="453.158" y2="453.158">
+<stop offset="0" stop-color="#ff8b00"/>
+<stop offset="1" stop-color="#ff5900"/>
+</linearGradient>
+</defs>
+<g id="图层-2" vectornator:layerName="图层 2">
+<path d="M79.2038 285.449L524.109 285.848C524.109 285.848 651.69 302.769 654.969 439.05C658.247 575.332 521.965 594.533 521.965 594.533L292.315 596.568L242.362 778.529L101.844 777.892L181.788 485.967L512.496 484.668C512.496 484.668 542.064 478.698 541.78 438.895C541.496 399.092 503.683 395.965 503.683 395.965L340.206 395.68L406.734 471.875L248.235 472.328L79.2038 285.449Z" fill="#5a5655" fill-rule="nonzero" opacity="1" stroke="none"/>
+</g>
+<g id="图层-3" vectornator:layerName="图层 3">
+<path d="M375.972 608.813L535.485 608.74L576.68 655.417L788.749 378.975L944.796 378.807L592.763 842.427" fill="url(#LinearGradient)" fill-rule="nonzero" opacity="1" stroke="#5a5655" stroke-linecap="butt" stroke-linejoin="miter" stroke-width="0"/>
+</g>
+</svg>

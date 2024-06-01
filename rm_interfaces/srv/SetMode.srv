@@ -1,0 +1,4 @@
+uint8 mode #0:自瞄红 1:自瞄蓝 2:小符红 3:小符蓝 4：大符红 5：大符蓝
+---
+bool success   # indicate successful run of triggered service
+string message # informational, e.g. for error messages

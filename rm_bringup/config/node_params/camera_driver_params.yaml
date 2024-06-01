@@ -1,0 +1,11 @@
+/**:
+  ros__parameters:
+    camera_info_url: package://rm_bringup/config/camera_info.yaml
+    exposure_time: 2500
+    gain: 15.0
+    resolution_width: 1280
+    resolution_height: 1024
+    offsetX: 0
+    offsetY: 0
+    camera_name: "daheng"
+    recording: false    #是否录制

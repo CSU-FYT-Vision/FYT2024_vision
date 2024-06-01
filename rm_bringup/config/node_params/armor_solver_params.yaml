@@ -1,0 +1,35 @@
+/**:
+  ros__parameters:
+    debug: true
+    target_frame: odom
+    max_armor_distance: 10.0
+
+    ekf:
+      sigma2_q_x: 0.05
+      sigma2_q_y: 0.05
+      sigma2_q_z: 0.05
+      sigma2_q_yaw: 1.0
+      sigma2_q_r: 80.0
+
+      r_x: 4e-4
+      r_y: 4e-4
+      r_z: 9e-4
+      r_yaw: 5e-3
+
+    tracker:
+      max_match_distance: 0.5
+      max_match_yaw_diff: 1.0
+
+      tracking_thres: 2
+      lost_time_thres: 1.0
+    
+    solver:
+      prediction_delay: 0.0
+      controller_delay: 0.0
+      max_tracking_v_yaw: 60.0 #转速(rad/s)大于这个值时瞄准机器人中心 
+      side_angle: 20.0 
+      bullet_speed: 25.0
+      compenstator_type: "ideal"
+      gravity: 10.0
+      resistance: 0.092
+      iteration_times: 20 # 补偿的迭代次数

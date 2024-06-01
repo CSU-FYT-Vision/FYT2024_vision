@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    debug: true
+    requests_limit: 5 
+    detect_r_tag: true # 是否使用传统方法识别R标
+    min_lightness: 100 # 二值化亮度阈值 (R标识别)
+    detector:
+      model: "package://rune_detector/model/yolox_rune_3.6m.onnx" # GPU模式下请用xml文件
+      device_type: "CPU"
+

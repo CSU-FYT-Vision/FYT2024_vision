@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:
+    target_frame: odom
+    timestamp_offset: 0.006
+    port_name: "/dev/ttyUART"
+    protocol: "infantry"
+    enable_data_print: false # 改为true将会打印从串口读出来的16进制数据
+

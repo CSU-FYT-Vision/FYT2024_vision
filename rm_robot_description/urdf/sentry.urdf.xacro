@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="sentry"
+  xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <link name="livox_frame" />
+
+  <link name = "base_link" />
+
+  <joint name="base_joint" type="fixed">
+    <origin xyz="-0.22 -0.11 0.12" rpy="0 0 0" />
+    <parent link="livox_frame" />
+    <child link="base_link" />
+    <axis xyz= "0 0 0" />
+  </joint>
+   
+  <link name = "base_footprint" />
+
+  <joint name = "base_footprint_joint" type="fixed">
+    <parent link = "base_link"/>
+    <child link = "base_footprint" />
+    <origin xyz = "0 0 -0.722" rpy = "0 0 0"/>
+  </joint>
+
+</robot>

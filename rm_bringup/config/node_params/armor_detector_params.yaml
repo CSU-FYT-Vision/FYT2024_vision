@@ -1,0 +1,24 @@
+/**:
+  ros__parameters:
+    debug: true
+    target_frame: odom
+    detect_color: 0
+    binary_thres: 90
+
+    use_pca: true # 使用PCA算法矫正灯条的角点
+    use_ba: true # 使用BA优化算法求解装甲板的Yaw角 
+    pnp_solution_selection: false # 从多个PnP解中选择pitch轴最接近15度的解 
+
+    light.min_ratio: 0.0001
+    light.max_ratio: 1.0
+    light.max_angle: 40.0
+    light.color_diff_thresh: 20
+    armor.min_light_ratio: 0.8
+    armor.min_small_center_distance: 0.8
+    armor.max_small_center_distance: 3.5
+    armor.min_large_center_distance: 3.5
+    armor.max_large_center_distance: 8.0
+    armor.max_angle: 35.0
+
+    classifier_threshold: 0.7
+    ignore_classes: ["negative"]

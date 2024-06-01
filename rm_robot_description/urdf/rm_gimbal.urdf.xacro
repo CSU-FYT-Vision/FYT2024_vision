@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="rm_gimbal"
+  xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:arg name="xyz" default="0.10 0 0.05" />
+  <xacro:arg name="rpy" default="0 0 0" />
+
+  <link name="odom" />
+
+  <link name="gimbal_link" />
+
+  <joint name="gimbal_joint" type="floating">
+    <parent link="odom" />
+    <child link="gimbal_link" />
+  </joint>
+
+  <link name="camera_link" />
+
+  <joint name="camera_joint" type="fixed">
+    <origin xyz="$(arg xyz)" rpy="$(arg rpy)" />
+    <parent link="gimbal_link" />
+    <child link="camera_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="camera_optical_frame" />
+
+  <joint name="camera_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}" />
+    <parent link="camera_link" />
+    <child link="camera_optical_frame" />
+  </joint>
+
+</robot>
