@@ -7,7 +7,7 @@
 
     use_pca: true # 使用PCA算法矫正灯条的角点
     use_ba: true # 使用BA优化算法求解装甲板的Yaw角 
-    pnp_solution_selection: false # 从多个PnP解中选择pitch轴最接近15度的解 
+    pnp_solution_selection: true # 从多个PnP解中选择pitch轴最接近15度的解 
 
     light.min_ratio: 0.0001
     light.max_ratio: 1.0

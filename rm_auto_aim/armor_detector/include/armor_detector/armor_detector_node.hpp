@@ -124,7 +124,6 @@ private:
 
   // Enable/Disable Armor Detector
   rclcpp::Service<rm_interfaces::srv::SetMode>::SharedPtr set_mode_srv_;
-  bool enable;
   bool use_ba_;
   bool pnp_solution_selection_;
 

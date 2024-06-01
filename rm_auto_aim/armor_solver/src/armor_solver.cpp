@@ -76,7 +76,7 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
     tf2::Quaternion tf_q;
     tf2::fromMsg(msg_q, tf_q);
     tf2::Matrix3x3(tf_q).getRPY(rpy[0], rpy[1], rpy[2]);
-    rpy[0] = -rpy[1];
+    rpy[1] = -rpy[1];
   } catch (tf2::TransformException &ex) {
     FYT_ERROR("armor_solver", "{}", ex.what());
     throw ex;

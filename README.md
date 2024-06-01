@@ -1,6 +1,6 @@
 # FYT2024 Vision Project
 
- 中南大学FYT战队24赛季视觉项目主仓库，该项目在原rm_vision项目上扩展了自瞄选板、能量机关识别与预测、雷达定位、自主导航等功能，为RoboMaster机器人实现了一套通用的算法框架
+ 中南大学FYT战队24赛季视觉项目主仓库，该项目在原rm_vision项目上扩展了自瞄选板、能量机关识别与预测、哨兵定位、自主导航等功能，为RoboMaster机器人实现了一套通用的算法框架
 
 > 目前赛场上出现过2次能量机关程序崩溃的现象
 
@@ -116,7 +116,7 @@ rosdep install --from-paths src --ignore-src -r -y
 
 修改rm_bringup/config/launch_params.yaml，选择需要启动的功能
 
-```
+```bash
 # 编译
 colcon build --symlink-install --parallel-workers 4 #本仓库包含的功能包过多，建议限制同时编译的线程数
 # 运行
@@ -124,6 +124,9 @@ source install/setup.bash
 ros2 launch rm_bringup bringup.launch.py
 ```
 
+默认日志和内录视频路径为`~/fyt2024-log/`
+
+> 我们的日志库是用fmt搓的，不使用ros2的日志库
 
 
 ## 四、自启动
