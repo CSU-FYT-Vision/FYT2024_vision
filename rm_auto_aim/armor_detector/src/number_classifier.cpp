@@ -117,7 +117,7 @@ void NumberClassifier::classify(const cv::Mat &src, Armor &armor) noexcept {
   armor.confidence = confidence;
   armor.number = class_names_[label_id];
 
-  armor.classfication_result = fmt::format("{}: {:.1f}%", armor.number, armor.confidence * 100.0);
+  armor.classfication_result = fmt::format("{}:{:.1f}%", armor.number, armor.confidence * 100.0);
 }
 
 void NumberClassifier::eraseIgnoreClasses(std::vector<Armor> &armors) noexcept {

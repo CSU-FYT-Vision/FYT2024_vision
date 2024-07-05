@@ -2,8 +2,6 @@
 
  中南大学FYT战队24赛季视觉项目主仓库，该项目在原rm_vision项目上扩展了自瞄选板、能量机关识别与预测、哨兵定位、自主导航等功能，为RoboMaster机器人实现了一套通用的算法框架
 
-> 目前赛场上出现过2次能量机关程序崩溃的现象
-
 
 ## 一、项目结构
 
@@ -205,3 +203,12 @@ limitations under the License.
 - [沈阳航空航天大学TUP战队2022赛季步兵视觉开源](https://github.com/tup-robomaster/TUP-InfantryVision-2022) 为本项目的能量机关识别与预测算法提供了参考
 - [沈阳航空航天大学YOLOX关键点检测模型](https://github.com/tup-robomaster/TUP-NN-Train-2) 提供了本项目能量机关识别模型训练代码
 - [四川大学OpenVINO异步推理代码](https://github.com/Ericsii/rm_vision-OpenVINO) 提供了本项目能量机关识别模型部署的代码
+- [上海交通大学自适应扩展卡尔曼滤波](https://github.com/julyfun/rm.cv.fans/tree/main) 使用Ceres自动微分功能，自动计算Jacobian矩阵
+
+
+## 更新日志
+
+- 参考上交开源，实现了EKF的自动求Jacobian矩阵
+- 增加了粒子滤波器，为状态估计提供新的选择
+- 修复了打符崩溃的问题（OpenVINO在推理时不能创建新的InferRequest，通过互斥锁解决）
+- 将自瞄解算修改为定时器回调，固定解算的频率

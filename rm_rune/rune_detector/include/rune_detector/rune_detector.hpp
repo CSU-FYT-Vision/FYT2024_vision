@@ -80,6 +80,7 @@ private:
   float conf_threshold_;
   int top_k_;
   float nms_threshold_;
+  std::mutex mtx_;
   std::vector<int> strides_;
   std::vector<GridAndStride> grid_strides_;
 

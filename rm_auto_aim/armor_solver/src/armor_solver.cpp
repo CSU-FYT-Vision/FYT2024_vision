@@ -67,7 +67,6 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
   }
 
   // Get current roll, yaw and pitch of gimbal
-  std::array<double, 3> rpy;
   try {
     auto gimbal_tf =
       tf2_buffer_->lookupTransform(target.header.frame_id, "gimbal_link", tf2::TimePointZero);
@@ -75,8 +74,8 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
 
     tf2::Quaternion tf_q;
     tf2::fromMsg(msg_q, tf_q);
-    tf2::Matrix3x3(tf_q).getRPY(rpy[0], rpy[1], rpy[2]);
-    rpy[1] = -rpy[1];
+    tf2::Matrix3x3(tf_q).getRPY(rpy_[0], rpy_[1], rpy_[2]);
+    rpy_[1] = -rpy_[1];
   } catch (tf2::TransformException &ex) {
     FYT_ERROR("armor_solver", "{}", ex.what());
     throw ex;
@@ -105,14 +104,14 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
 
   // Calculate yaw, pitch, distance
   double yaw, pitch;
-  calcYawAndPitch(chosen_armor_position, rpy, yaw, pitch);
+  calcYawAndPitch(chosen_armor_position, rpy_, yaw, pitch);
   double distance = chosen_armor_position.norm();
 
   // Initialize gimbal_cmd
   rm_interfaces::msg::GimbalCmd gimbal_cmd;
   gimbal_cmd.header = target.header;
   gimbal_cmd.distance = distance;
-  gimbal_cmd.fire_advice = isOnTarget(rpy[2], rpy[1], yaw, pitch, distance);
+  gimbal_cmd.fire_advice = isOnTarget(rpy_[2], rpy_[1], yaw, pitch, distance);
 
   switch (state) {
     case TRACKING_ARMOR: {
@@ -139,10 +138,11 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
                                             target.dz,
                                             target.armors_num);
         chosen_armor_position = armor_positions.at(idx);
+        gimbal_cmd.distance = chosen_armor_position.norm();
         if (chosen_armor_position.norm() < 0.1) {
           throw std::runtime_error("No valid armor to shoot");
         }
-        calcYawAndPitch(chosen_armor_position, rpy, yaw, pitch);
+        calcYawAndPitch(chosen_armor_position, rpy_, yaw, pitch);
       }
       break;
     }
@@ -158,14 +158,14 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
         overflow_count_ = 0;
       }
       gimbal_cmd.fire_advice = true;
-      calcYawAndPitch(target_position, rpy, yaw, pitch);
+      calcYawAndPitch(target_position, rpy_, yaw, pitch);
       break;
     }
   }
   gimbal_cmd.yaw = yaw * 180 / M_PI;
   gimbal_cmd.pitch = pitch * 180 / M_PI;
-  gimbal_cmd.yaw_diff = (yaw - rpy[2]) * 180 / M_PI;
-  gimbal_cmd.pitch_diff = (pitch - rpy[1]) * 180 / M_PI;
+  gimbal_cmd.yaw_diff = (yaw - rpy_[2]) * 180 / M_PI;
+  gimbal_cmd.pitch_diff = (pitch - rpy_[1]) * 180 / M_PI;
 
   if (gimbal_cmd.fire_advice) {
     FYT_DEBUG("armor_solver", "You Need Fire!");
@@ -272,4 +272,17 @@ void Solver::calcYawAndPitch(const Eigen::Vector3d &p,
     pitch = temp_pitch;
   }
 }
+
+std::vector<std::pair<double, double>> Solver::getTrajectory() const noexcept {
+  auto trajectory = trajectory_compensator_->getTrajectory(15, rpy_[1]);
+  // Rotate
+  for (auto &p : trajectory) {
+    double x = p.first;
+    double y = p.second;
+    p.first = x * cos(rpy_[1]) + y * sin(rpy_[1]);
+    p.second = -x * sin(rpy_[1]) + y * cos(rpy_[1]);
+  }
+  return trajectory;
+}
+
 }  // namespace fyt::auto_aim

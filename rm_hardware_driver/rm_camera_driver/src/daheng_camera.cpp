@@ -120,13 +120,15 @@ DahengCameraNode::DahengCameraNode(const rclcpp::NodeOptions &options)
   bool enable_recorder = this->declare_parameter("recording", false);
   if (enable_recorder) {
     std::string home = std::getenv("HOME");
-    std::filesystem::path video_path =
-      home + "/fyt2024-log/video/" + std::to_string(std::time(nullptr)) + ".avi";
+
+    namespace fs = std::filesystem;
+    std::filesystem::path video_path = fs::path(home) / "/fyt2024-log/video/" /
+                                       std::string(std::to_string(std::time(nullptr)) + ".avi");
+
     recorder_ = std::make_unique<Recorder>(
       video_path, frame_rate_, cv::Size(resolution_width_, resolution_height_));
     recorder_->start();
-    FYT_INFO(
-      "camera_driver", "Recorder started! Video file: {}", video_path.string());
+    FYT_INFO("camera_driver", "Recorder started! Video file: {}", video_path.string());
   }
 
   FYT_INFO("camera_driver", "DahengCameraNode has been initialized!");

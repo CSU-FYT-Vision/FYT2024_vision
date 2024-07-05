@@ -1,7 +1,3 @@
-// Copyright Chen Jun 2023. Licensed under the MIT License.
-//
-// Additional modifications and features by Chengfu Zou, Labor. Licensed under Apache License 2.0.
-//
 // Copyright (C) FYT Vision Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,5 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rm_utils/math/extended_kalman_filter.hpp"
-
+#include "rm_utils/math/particle_filter.hpp"

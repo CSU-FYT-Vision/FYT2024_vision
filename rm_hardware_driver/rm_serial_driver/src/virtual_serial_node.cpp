@@ -60,10 +60,14 @@ public:
     heartbeat_ = HeartBeatPublisher::create(this);
 
     // Param client
-    auto autoaim_set_mode_client_ =
+    auto autoaim_set_mode_client_1 =
       this->create_client<rm_interfaces::srv::SetMode>("armor_detector/set_mode");
-    set_mode_clients_.emplace(autoaim_set_mode_client_->get_service_name(),
-                              autoaim_set_mode_client_);
+    set_mode_clients_.emplace(autoaim_set_mode_client_1->get_service_name(),
+                              autoaim_set_mode_client_1);
+    auto autoaim_set_mode_client_2 =
+      this->create_client<rm_interfaces::srv::SetMode>("armor_solver/set_mode");
+    set_mode_clients_.emplace(autoaim_set_mode_client_2->get_service_name(),
+                              autoaim_set_mode_client_2);
     if (has_rune_) {
       auto client1 = this->create_client<rm_interfaces::srv::SetMode>("rune_detector/set_mode");
       set_mode_clients_.emplace(client1->get_service_name(), client1);

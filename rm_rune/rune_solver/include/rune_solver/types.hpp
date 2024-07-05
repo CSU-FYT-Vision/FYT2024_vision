@@ -53,5 +53,10 @@ const std::vector<cv::Point3f> RUNE_OBJECT_POINTS = {cv::Point3f(0, 0, 0) / 1000
                                                      cv::Point3f(0, -858.5, -160) / 1000,
                                                      cv::Point3f(0, -541.5, -186) / 1000};
 
+#define BIG_RUNE_CURVE(x, a, omega, b, c, d, sign) \
+  ((-((a) / (omega) * ceres::cos((omega) * ((x) + (d)))) + (b) * ((x) + (d)) + (c)) * (sign))
+
+#define SMALL_RUNE_CURVE(x, a, b, c, sign) (((a) * ((x) + (b)) + (c)) * (sign))
+
 }  // namespace fyt::rune
 #endif  // RUNE_SOLVER_TYPES_HPP_

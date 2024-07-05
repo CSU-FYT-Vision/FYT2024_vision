@@ -1,7 +1,3 @@
-// Copyright Chen Jun 2023. Licensed under the MIT License.
-//
-// Additional modifications and features by Chengfu Zou, Labor. Licensed under Apache License 2.0.
-//
 // Copyright (C) FYT Vision Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,5 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef RUNE_SOLVER_EKF_FUNCTIONS_HPP_
+#define RUNE_SOLVER_EKF_FUNCTIONS_HPP_
+
+#include <ceres/ceres.h>
+
 #include "rm_utils/math/extended_kalman_filter.hpp"
 
+namespace fyt::rune {
+
+constexpr int X_N = 4, Z_N = 4;
+
+struct Predict {
+  template <typename T>
+  void operator()(const T x0[X_N], T x1[X_N]) {
+    for (int i = 0; i < X_N; ++i) {
+      x1[i] = x0[i];
+    }
+  }
+};
+
+struct Measure {
+  template <typename T>
+  void operator()(const T x[Z_N], T z[Z_N]) {
+    for (int i = 0; i < Z_N; ++i) {
+      z[i] = x[i];
+    }
+  }
+};
+
+using RuneCenterEKF = ExtendedKalmanFilter<X_N, Z_N, Predict, Measure>;
+
+}  // namespace fyt::rune
+#endif

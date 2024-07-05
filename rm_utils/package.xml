@@ -16,6 +16,7 @@
   <depend>fmt</depend>
   <depend>eigen</depend>
   <depend>opencv</depend>
+  <depend>ceres</depend>
   <depend>rcpputils</depend>
 
 

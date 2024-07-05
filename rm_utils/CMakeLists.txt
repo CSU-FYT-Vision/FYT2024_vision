@@ -7,7 +7,7 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic -O3)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -19,6 +19,7 @@ find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(OpenCV 4 REQUIRED)
+find_package(Ceres REQUIRED)
 find_package(rcpputils REQUIRED)
 find_package(fmt REQUIRED)
 
@@ -49,11 +50,16 @@ set(dependencies
   Eigen3
   eigen3_cmake_module
   geometry_msgs
+  Ceres
   OpenCV
 )
 
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
-
+target_include_directories(${PROJECT_NAME} PUBLIC ${OpenCV_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME}
+  ${OpenCV_LIBS}
+  ${CERES_LIBRARIES}
+)
 # Install include directories
 install(DIRECTORY include/
   DESTINATION include

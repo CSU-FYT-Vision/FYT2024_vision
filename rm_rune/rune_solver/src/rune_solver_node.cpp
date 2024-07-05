@@ -14,6 +14,8 @@
 // limitations under the License.
 
 #include "rune_solver/rune_solver_node.hpp"
+// std
+#include <chrono>
 // ros2
 #include <cv_bridge/cv_bridge.h>
 #include <rmw/qos_profiles.h>
@@ -27,6 +29,7 @@
 #include "rm_utils/common.hpp"
 #include "rm_utils/logger/log.hpp"
 #include "rm_utils/math/pnp_solver.hpp"
+#include "rune_solver/motion_model.hpp"
 
 namespace fyt::rune {
 RuneSolverNode::RuneSolverNode(const rclcpp::NodeOptions &options) : Node("rune_solver", options) {
@@ -54,43 +57,27 @@ RuneSolverNode::RuneSolverNode(const rclcpp::NodeOptions &options) : Node("rune_
   // state: x, y, z, yaw
   // measurement: x, y, z, yaw
   // f - Process function
-  auto f = [](const Eigen::VectorXd &x) {
-    Eigen::VectorXd x_new = x;
-    return x_new;
-  };
-  // J_f - Jacobian of process function
-  auto j_f = [](const Eigen::VectorXd &) {
-    Eigen::MatrixXd f = Eigen::MatrixXd::Identity(4, 4);
-    return f;
-  };
+  auto f = Predict();
   // h - Observation function
-  auto h = [](const Eigen::VectorXd &x) {
-    Eigen::VectorXd z = x;
-    return z;
-  };
-  // J_h - Jacobian of observation function
-  auto j_h = [](const Eigen::VectorXd &x) {
-    Eigen::MatrixXd h = Eigen::MatrixXd::Identity(4, 4);
-    return h;
-  };
+  auto h = Measure();
   // update_Q - process noise covariance matrix
   std::vector<double> q_vec =
     declare_parameter("ekf.q", std::vector<double>{0.001, 0.001, 0.001, 0.001});
   auto u_q = [q_vec]() {
-    Eigen::MatrixXd q = Eigen::MatrixXd::Zero(4, 4);
+    Eigen::Matrix<double, X_N, X_N> q = Eigen::MatrixXd::Zero(4, 4);
     q.diagonal() << q_vec[0], q_vec[1], q_vec[2], q_vec[3];
     return q;
   };
   // update_R - measurement noise covariance matrix
   std::vector<double> r_vec = declare_parameter("ekf.r", std::vector<double>{0.1, 0.1, 0.1, 0.1});
-  auto u_r = [r_vec](const Eigen::VectorXd &z) {
-    Eigen::MatrixXd r = Eigen::MatrixXd::Zero(4, 4);
+  auto u_r = [r_vec](const Eigen::Matrix<double, Z_N, 1> &z) {
+    Eigen::Matrix<double, Z_N, Z_N> r = Eigen::MatrixXd::Zero(4, 4);
     r.diagonal() << r_vec[0], r_vec[1], r_vec[2], r_vec[3];
     return r;
   };
   // P - error estimate covariance matrix
   Eigen::MatrixXd p0 = Eigen::MatrixXd::Identity(4, 4);
-  rune_solver_->ekf = ExtendedKalmanFilter(f, h, j_f, j_h, u_q, u_r, p0);
+  rune_solver_->ekf = std::make_unique<RuneCenterEKF>(f, h, u_q, u_r, p0);
 
   // Target subscriber
   rune_target_sub_ = this->create_subscription<rm_interfaces::msg::RuneTarget>(
@@ -164,9 +151,12 @@ RuneSolverNode::RuneSolverNode(const rclcpp::NodeOptions &options) : Node("rune_
       "rune_solver/marker", rclcpp::SensorDataQoS());
   }
   last_rune_target_.header.frame_id = "";
+
   // Timer 250 Hz
-  pub_timer_ = this->create_wall_timer(std::chrono::milliseconds(4),
-                                       std::bind(&RuneSolverNode::timerCallback, this));
+  int frequency = 250;
+  auto timer_period = std::chrono::milliseconds(1000 / frequency);
+  pub_timer_ =
+    this->create_wall_timer(timer_period, std::bind(&RuneSolverNode::timerCallback, this));
 
   // Heartbeat
   heartbeat_ = HeartBeatPublisher::create(this);
@@ -251,10 +241,10 @@ void RuneSolverNode::timerCallback() {
     // Publish visualization marker
     visualization_msgs::msg::MarkerArray marker_array;
     if (rune_solver_->tracker_state == RuneSolver::LOST) {
-      obs_pos_marker_.action = visualization_msgs::msg::Marker::DELETE;
-      pred_pos_marker_.action = visualization_msgs::msg::Marker::DELETE;
-      r_tag_pos_marker_.action = visualization_msgs::msg::Marker::DELETE;
-      aimming_line_marker_.action = visualization_msgs::msg::Marker::DELETE;
+      obs_pos_marker_.action = visualization_msgs::msg::Marker::DELETEALL;
+      pred_pos_marker_.action = visualization_msgs::msg::Marker::DELETEALL;
+      r_tag_pos_marker_.action = visualization_msgs::msg::Marker::DELETEALL;
+      aimming_line_marker_.action = visualization_msgs::msg::Marker::DELETEALL;
       marker_array.markers.push_back(obs_pos_marker_);
       marker_array.markers.push_back(pred_pos_marker_);
       marker_array.markers.push_back(r_tag_pos_marker_);

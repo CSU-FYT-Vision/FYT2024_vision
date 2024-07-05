@@ -26,19 +26,27 @@ void LightCornerCorrector::correctCorners(Armor &armor, const cv::Mat &gray_img)
   if (armor.left_light.width > PASS_OPTIMIZE_WIDTH) {
     // Find the symmetry axis of the light
     SymmetryAxis left_axis = findSymmetryAxis(gray_img, armor.left_light);
-    // Find the corner of the light
-    armor.left_light.top = findCorner(gray_img, armor.left_light, left_axis, "top");
-    armor.left_light.bottom = findCorner(gray_img, armor.left_light, left_axis, "bottom");
     armor.left_light.center = left_axis.centroid;
+    // Find the corner of the light
+    if (cv::Point2f t = findCorner(gray_img, armor.left_light, left_axis, "top"); t.x > 0) {
+      armor.left_light.top = t;
+    }
+    if (cv::Point2f b = findCorner(gray_img, armor.left_light, left_axis, "bottom"); b.x > 0) {
+      armor.left_light.bottom = b;
+    }
   }
 
   if (armor.right_light.width > PASS_OPTIMIZE_WIDTH) {
     // Find the symmetry axis of the light
     SymmetryAxis right_axis = findSymmetryAxis(gray_img, armor.right_light);
-    // Find the corner of the light
-    armor.right_light.top = findCorner(gray_img, armor.right_light, right_axis, "top");
-    armor.right_light.bottom = findCorner(gray_img, armor.right_light, right_axis, "bottom");
     armor.right_light.center = right_axis.centroid;
+    // Find the corner of the light
+    if (cv::Point2f t = findCorner(gray_img, armor.right_light, right_axis, "top"); t.x > 0) {
+      armor.right_light.top = t;
+    }
+    if (cv::Point2f b = findCorner(gray_img, armor.right_light, right_axis, "bottom"); b.x > 0) {
+      armor.right_light.bottom = b;
+    }
   }
 }
 
@@ -117,7 +125,7 @@ cv::Point2f LightCornerCorrector::findCorner(const cv::Mat &gray_img,
   float dy = axis.direction.y * oper;
 
   std::vector<cv::Point2f> candidates;
-  
+
   // Select multiple corner candidates and take the average as the final corner
   int n = light.width - 2;
   int half_n = std::round(n / 2);
@@ -128,6 +136,7 @@ cv::Point2f LightCornerCorrector::findCorner(const cv::Mat &gray_img,
     cv::Point2f prev = cv::Point2f(x0, y0);
     cv::Point2f corner = cv::Point2f(x0, y0);
     float max_brightness_diff = 0;
+    bool has_corner = false;
     // Search along the symmetry axis to find the corner that has the maximum brightness difference
     for (float x = x0 + dx, y = y0 + dy; distance(x, y, x0, y0) < L * (END - START);
          x += dx, y += dy) {
@@ -136,21 +145,26 @@ cv::Point2f LightCornerCorrector::findCorner(const cv::Mat &gray_img,
         break;
       }
 
-      float brightness_diff = gray_img.at<uchar>(cv::Point(prev)) - gray_img.at<uchar>(cur);
+      float brightness_diff = gray_img.at<uchar>(prev) - gray_img.at<uchar>(cur);
       if (brightness_diff > max_brightness_diff && gray_img.at<uchar>(prev) > axis.mean_val) {
         max_brightness_diff = brightness_diff;
         corner = prev;
+        has_corner = true;
       }
 
       prev = cur;
     }
 
-    candidates.emplace_back(corner);
+    if (has_corner) {
+      candidates.emplace_back(corner);
+    }
   }
-  cv::Point2f result = std::accumulate(candidates.begin(), candidates.end(), cv::Point2f(0, 0)) /
-                       static_cast<float>(candidates.size());
+  if (!candidates.empty()) {
+    cv::Point2f result = std::accumulate(candidates.begin(), candidates.end(), cv::Point2f(0, 0));
+    return result / static_cast<float>(candidates.size());
+  }
 
-  return result;
+  return cv::Point2f(-1, -1);
 }
 
 }  // namespace fyt::auto_aim

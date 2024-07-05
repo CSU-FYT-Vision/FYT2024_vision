@@ -66,7 +66,7 @@ double RuneSolver::init(const rm_interfaces::msg::RuneTarget::SharedPtr received
     }
 
     ekf_state_ = getStateFromTransform(T_odom_2_rune);
-    ekf.setState(ekf_state_);
+    ekf->setState(ekf_state_);
   } catch (...) {
     FYT_ERROR("rune_solver", "Init failed");
     return 0;
@@ -109,8 +109,8 @@ double RuneSolver::update(const rm_interfaces::msg::RuneTarget::SharedPtr receiv
       }
 
       Eigen::Vector4d measurement = getStateFromTransform(T_odom_2_rune);
-      ekf.predict();
-      ekf_state_ = ekf.update(measurement);
+      ekf->predict();
+      ekf_state_ = ekf->update(measurement);
     } catch (...) {
       FYT_ERROR("rune_solver", "EKF update failed");
       return 0;

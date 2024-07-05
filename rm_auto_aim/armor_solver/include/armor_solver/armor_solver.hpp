@@ -47,10 +47,7 @@ public:
 
   enum State { TRACKING_ARMOR = 0, TRACKING_CENTER = 1 } state;
 
-  std::vector<std::pair<double, double>> getTrajectory(double distance,
-                                                       double angle) const noexcept {
-    return trajectory_compensator_->getTrajectory(distance, angle);
-  }
+  std::vector<std::pair<double, double>> getTrajectory() const noexcept; 
 
 private:
   // Get the armor positions from the target robot
@@ -81,6 +78,8 @@ private:
                   const double distance) const noexcept;
 
   std::unique_ptr<TrajectoryCompensator> trajectory_compensator_;
+
+  std::array<double, 3> rpy_;
 
   double prediction_delay_;
   double controller_delay_;

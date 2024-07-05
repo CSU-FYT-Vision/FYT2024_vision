@@ -17,6 +17,7 @@
 
 // std
 #include <memory>
+#include <thread>
 // ros2
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int64.hpp>
@@ -26,25 +27,15 @@ class HeartBeatPublisher {
 public:
   using SharedPtr = std::shared_ptr<HeartBeatPublisher>;
 
-  static SharedPtr create(rclcpp::Node *node) {
-    return std::shared_ptr<HeartBeatPublisher>(new HeartBeatPublisher(node));
-  }
+  static SharedPtr create(rclcpp::Node *node);
 
+  ~HeartBeatPublisher();
 private:
-  explicit HeartBeatPublisher(rclcpp::Node *node) {
-    message_.data = 0;
-    std::string node_name = node->get_name();
-    std::string topic_name = node_name + "/heartbeat";
-    publisher_ = node->create_publisher<std_msgs::msg::Int64>(topic_name, 1);
-    timer_ = node->create_wall_timer(std::chrono::seconds(1), [this]() {
-      message_.data++;
-      publisher_->publish(message_);
-    });
-  }
+  explicit HeartBeatPublisher(rclcpp::Node *node);
 
   std_msgs::msg::Int64 message_;
   rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr publisher_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  std::thread pub_thread_;
 };
 }  // namespace fyt
 

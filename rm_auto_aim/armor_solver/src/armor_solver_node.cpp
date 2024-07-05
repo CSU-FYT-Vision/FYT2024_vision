@@ -18,11 +18,13 @@
 
 #include "armor_solver/armor_solver_node.hpp"
 
-#include <tf2/exceptions.h>
 // std
 #include <memory>
-#include <rm_utils/heartbeat.hpp>
 #include <vector>
+// project
+#include "armor_solver/motion_model.hpp"
+#include "rm_utils/common.hpp"
+#include "rm_utils/heartbeat.hpp"
 
 namespace fyt::auto_aim {
 ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
@@ -43,55 +45,11 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
   // EKF
   // xa = x_armor, xc = x_robot_center
   // state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r
-  // measurement: xa, ya, za, yaw
+  // measurement: p, y, d, yaw
   // f - Process function
-  auto f = [this](const Eigen::VectorXd &x) {
-    Eigen::VectorXd x_new = x;
-    x_new(0) += x(1) * dt_;
-    x_new(2) += x(3) * dt_;
-    x_new(4) += x(5) * dt_;
-    x_new(6) += x(7) * dt_;
-    return x_new;
-  };
-  // J_f - Jacobian of process function
-  auto j_f = [this](const Eigen::VectorXd &) {
-    Eigen::MatrixXd f(9, 9);
-    // clang-format off
-    f <<  1,   dt_, 0,   0,   0,   0,   0,   0,   0,
-          0,   1,   0,   0,   0,   0,   0,   0,   0,
-          0,   0,   1,   dt_, 0,   0,   0,   0,   0, 
-          0,   0,   0,   1,   0,   0,   0,   0,   0,
-          0,   0,   0,   0,   1,   dt_, 0,   0,   0,
-          0,   0,   0,   0,   0,   1,   0,   0,   0,
-          0,   0,   0,   0,   0,   0,   1,   dt_, 0,
-          0,   0,   0,   0,   0,   0,   0,   1,   0,
-          0,   0,   0,   0,   0,   0,   0,   0,   1;
-    // clang-format on
-    return f;
-  };
+  auto f = Predict(0.005);
   // h - Observation function
-  auto h = [](const Eigen::VectorXd &x) {
-    Eigen::VectorXd z(4);
-    double xc = x(0), yc = x(2), yaw = x(6), r = x(8);
-    z(0) = xc - r * cos(yaw);  // xa
-    z(1) = yc - r * sin(yaw);  // ya
-    z(2) = x(4);               // za
-    z(3) = x(6);               // yaw
-    return z;
-  };
-  // J_h - Jacobian of observation function
-  auto j_h = [](const Eigen::VectorXd &x) {
-    Eigen::MatrixXd h(4, 9);
-    double yaw = x(6), r = x(8);
-    // clang-format off
-    //    xc   v_xc yc   v_yc za   v_za yaw            v_yaw  r
-    h <<  1,   0,   0,   0,   0,   0,   r*sin(yaw),  0,   -cos(yaw),
-          0,   0,   1,   0,   0,   0,   -r*cos(yaw), 0,   -sin(yaw),
-          0,   0,   0,   0,   1,   0,   0,              0,   0,
-          0,   0,   0,   0,   0,   0,   1,              0,   0;
-    // clang-format on
-    return h;
-  };
+  auto h = Measure();
   // update_Q - process noise covariance matrix
   s2qx_ = declare_parameter("ekf.sigma2_q_x", 20.0);
   s2qy_ = declare_parameter("ekf.sigma2_q_y", 20.0);
@@ -99,7 +57,7 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
   s2qyaw_ = declare_parameter("ekf.sigma2_q_yaw", 100.0);
   s2qr_ = declare_parameter("ekf.sigma2_q_r", 800.0);
   auto u_q = [this]() {
-    Eigen::MatrixXd q(9, 9);
+    Eigen::Matrix<double, X_N, X_N> q;
     double t = dt_, x = s2qx_, y = s2qy_, z = s2qz_, yaw = s2qyaw_, r = s2qr_;
     double q_x_x = pow(t, 4) / 4 * x, q_x_vx = pow(t, 3) / 2 * x, q_vx_vx = pow(t, 2) * x;
     double q_y_y = pow(t, 4) / 4 * y, q_y_vy = pow(t, 3) / 2 * y, q_vy_vy = pow(t, 2) * y;
@@ -126,15 +84,20 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
   r_y_ = declare_parameter("ekf.r_y", 0.05);
   r_z_ = declare_parameter("ekf.r_z", 0.05);
   r_yaw_ = declare_parameter("ekf.r_yaw", 0.02);
-  auto u_r = [this](const Eigen::VectorXd &z) {
-    Eigen::DiagonalMatrix<double, 4> r;
-    r.diagonal() << abs(r_x_ * z[0]), abs(r_y_ * z[1]), abs(r_z_ * z[2]), r_yaw_;
+  auto u_r = [this](const Eigen::Matrix<double, Z_N, 1> &z) {
+    Eigen::Matrix<double, Z_N, Z_N> r;
+    // clang-format off
+    r << r_x_ * std::abs(z[0]), 0, 0, 0,
+         0, r_y_ * std::abs(z[1]), 0, 0,
+         0, 0, r_z_ * std::abs(z[2]), 0,
+         0, 0, 0, r_yaw_;
+    // clang-format on
     return r;
   };
   // P - error estimate covariance matrix
   Eigen::DiagonalMatrix<double, 9> p0;
   p0.setIdentity();
-  tracker_->ekf = ExtendedKalmanFilter{f, h, j_f, j_h, u_q, u_r, p0};
+  tracker_->ekf = std::make_unique<RobotStateEKF>(f, h, u_q, u_r, p0);
 
   // Subscriber with tf2 message_filter
   // tf2 relevant
@@ -169,6 +132,70 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
   gimbal_pub_ = this->create_publisher<rm_interfaces::msg::GimbalCmd>("armor_solver/cmd_gimbal",
                                                                       rclcpp::SensorDataQoS());
 
+  int frequency = this->declare_parameter("frequency", 250);
+  auto timer_period = std::chrono::milliseconds(1000 / frequency);
+  pub_timer_ =
+    this->create_wall_timer(timer_period, std::bind(&ArmorSolverNode::timerCallback, this));
+  armor_target_.header.frame_id = "";
+
+  // Enable/Disable Armor Solver
+  set_mode_srv_ = this->create_service<rm_interfaces::srv::SetMode>(
+    "armor_solver/set_mode",
+    std::bind(
+      &ArmorSolverNode::setModeCallback, this, std::placeholders::_1, std::placeholders::_2));
+
+  if (debug_mode_) {
+    initMarkers();
+  }
+
+  // Heartbeat
+  heartbeat_ = HeartBeatPublisher::create(this);
+}
+
+void ArmorSolverNode::timerCallback() {
+  if (solver_ == nullptr) {
+    return;
+  }
+
+  // Init message
+  rm_interfaces::msg::GimbalCmd control_msg;
+
+  // If target never detected
+  if (armor_target_.header.frame_id.empty()) {
+    control_msg.yaw_diff = 0;
+    control_msg.pitch_diff = 0;
+    control_msg.distance = -1;
+    control_msg.pitch = 0;
+    control_msg.yaw = 0;
+    control_msg.fire_advice = false;
+    gimbal_pub_->publish(control_msg);
+    return;
+  }
+
+  if (armor_target_.tracking) {
+    try {
+      control_msg = solver_->solve(armor_target_, this->now(), tf2_buffer_);
+    } catch (...) {
+      FYT_ERROR("armor_solver", "Something went wrong in solver!");
+      control_msg.yaw_diff = 0;
+      control_msg.pitch_diff = 0;
+      control_msg.distance = -1;
+      control_msg.fire_advice = false;
+    }
+  } else {
+    control_msg.yaw_diff = 0;
+    control_msg.pitch_diff = 0;
+    control_msg.distance = -1;
+    control_msg.fire_advice = false;
+  }
+  gimbal_pub_->publish(control_msg);
+
+  if (debug_mode_) {
+    publishMarkers(armor_target_, control_msg);
+  }
+}
+
+void ArmorSolverNode::initMarkers() noexcept {
   // Visualization Marker Publisher
   // See http://wiki.ros.org/rviz/DisplayTypes/Marker
   position_marker_.ns = "position";
@@ -191,18 +218,17 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
   angular_v_marker_.color.b = 1.0;
   angular_v_marker_.color.g = 1.0;
   armors_marker_.ns = "filtered_armors";
-  armors_marker_.type = visualization_msgs::msg::Marker::SPHERE_LIST;
-  armors_marker_.scale.x = armors_marker_.scale.y = armors_marker_.scale.z = 0.1;
+  armors_marker_.type = visualization_msgs::msg::Marker::CUBE;
+  armors_marker_.scale.x = 0.03;
+  armors_marker_.scale.z = 0.125;
   armors_marker_.color.a = 1.0;
-  armors_marker_.color.r = 1.0;
-  aimming_line_marker_.ns = "aimming_line";
-  aimming_line_marker_.type = visualization_msgs::msg::Marker::ARROW;
-  aimming_line_marker_.scale.x = 0.03;
-  aimming_line_marker_.scale.y = 0.05;
-  aimming_line_marker_.color.a = 0.5;
-  aimming_line_marker_.color.r = 1.0;
-  aimming_line_marker_.color.b = 1.0;
-  aimming_line_marker_.color.g = 1.0;
+  armors_marker_.color.b = 1.0;
+  selection_marker_.ns = "selection";
+  selection_marker_.type = visualization_msgs::msg::Marker::SPHERE;
+  selection_marker_.scale.x = selection_marker_.scale.y = selection_marker_.scale.z = 0.1;
+  selection_marker_.color.a = 1.0;
+  selection_marker_.color.g = 1.0;
+  selection_marker_.color.r = 1.0;
   trajectory_marker_.ns = "trajectory";
   trajectory_marker_.type = visualization_msgs::msg::Marker::POINTS;
   trajectory_marker_.scale.x = 0.01;
@@ -215,9 +241,6 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
 
   marker_pub_ =
     this->create_publisher<visualization_msgs::msg::MarkerArray>("armor_solver/marker", 10);
-
-  // Heartbeat
-  heartbeat_ = HeartBeatPublisher::create(this);
 }
 
 void ArmorSolverNode::armorsCallback(const rm_interfaces::msg::Armors::SharedPtr armors_msg) {
@@ -261,6 +284,11 @@ void ArmorSolverNode::armorsCallback(const rm_interfaces::msg::Armors::SharedPtr
   } else {
     dt_ = (time - last_time_).seconds();
     tracker_->lost_thres = std::abs(static_cast<int>(lost_time_thres_ / dt_));
+    if (tracker_->tracked_id == "outpost") {
+      tracker_->ekf->setPredictFunc(Predict{dt_, MotionModel::CONSTANT_ROTATION});
+    } else {
+      tracker_->ekf->setPredictFunc(Predict{dt_, MotionModel::CONSTANT_VEL_ROT});
+    }
     tracker_->update(armors_msg);
     // Publish measurement
     measure_msg.x = tracker_->measurement(0);
@@ -291,31 +319,11 @@ void ArmorSolverNode::armorsCallback(const rm_interfaces::msg::Armors::SharedPtr
       target_msg.dz = tracker_->dz;
     }
   }
+
+  // Store and Publish the target_msg
+  armor_target_ = target_msg;
   target_pub_->publish(target_msg);
 
-  // Solve control command
-  rm_interfaces::msg::GimbalCmd control_msg;
-  if (target_msg.tracking) {
-    try {
-      control_msg = solver_->solve(target_msg, this->now(), tf2_buffer_);
-    } catch (...) {
-      FYT_ERROR("armor_solver", "Something went wrong in solver!");
-      control_msg.yaw_diff = 0;
-      control_msg.pitch_diff = 0;
-      control_msg.distance = -1;
-      control_msg.fire_advice = false;
-    }
-  } else {
-    control_msg.yaw_diff = 0;
-    control_msg.pitch_diff = 0;
-    control_msg.distance = -1;
-    control_msg.fire_advice = false;
-  }
-  gimbal_pub_->publish(control_msg);
-
-  if (debug_mode_) {
-    publishMarkers(target_msg, control_msg);
-  }
   last_time_ = time;
 }
 
@@ -325,8 +333,10 @@ void ArmorSolverNode::publishMarkers(const rm_interfaces::msg::Target &target_ms
   linear_v_marker_.header = target_msg.header;
   angular_v_marker_.header = target_msg.header;
   armors_marker_.header = target_msg.header;
-  aimming_line_marker_.header = target_msg.header;
-  aimming_line_marker_.header.frame_id = target_frame_ + "_rectify";
+  selection_marker_.header = target_msg.header;
+  trajectory_marker_.header = target_msg.header;
+
+  visualization_msgs::msg::MarkerArray marker_array;
 
   if (target_msg.tracking) {
     double yaw = target_msg.yaw, r1 = target_msg.radius_1, r2 = target_msg.radius_2;
@@ -355,7 +365,7 @@ void ArmorSolverNode::publishMarkers(const rm_interfaces::msg::Target &target_ms
     angular_v_marker_.points.emplace_back(arrow_end);
 
     armors_marker_.action = visualization_msgs::msg::Marker::ADD;
-    armors_marker_.points.clear();
+    armors_marker_.scale.y = tracker_->tracked_armor.type == "small" ? 0.135 : 0.23;
     // Draw armors
     bool is_current_pair = true;
     size_t a_n = target_msg.armors_num;
@@ -374,36 +384,38 @@ void ArmorSolverNode::publishMarkers(const rm_interfaces::msg::Target &target_ms
       }
       p_a.x = xc - r * cos(tmp_yaw);
       p_a.y = yc - r * sin(tmp_yaw);
-      armors_marker_.points.emplace_back(p_a);
-    }
-    aimming_line_marker_.action = visualization_msgs::msg::Marker::ADD;
-    aimming_line_marker_.points.clear();
-    geometry_msgs::msg::Point aimming_line_start, aimming_line_end;
-    aimming_line_marker_.points.emplace_back(aimming_line_start);
-    aimming_line_end.y = 15 * sin(gimbal_cmd.yaw * M_PI / 180);
-    aimming_line_end.x = 15 * cos(gimbal_cmd.yaw * M_PI / 180);
-    aimming_line_end.z = 15 * sin(gimbal_cmd.pitch * M_PI / 180);
-    aimming_line_marker_.points.emplace_back(aimming_line_end);
-    if (gimbal_cmd.fire_advice) {
-      aimming_line_marker_.color.r = 0;
-      aimming_line_marker_.color.g = 1;
-      aimming_line_marker_.color.b = 0;
-    } else {
-      aimming_line_marker_.color.r = 1;
-      aimming_line_marker_.color.g = 1;
-      aimming_line_marker_.color.b = 1;
+
+      armors_marker_.id = i;
+      armors_marker_.pose.position = p_a;
+      tf2::Quaternion q;
+      q.setRPY(0, target_msg.id == "outpost" ? -0.2618 : 0.2618, tmp_yaw);
+      armors_marker_.pose.orientation = tf2::toMsg(q);
+      marker_array.markers.emplace_back(armors_marker_);
     }
 
+    selection_marker_.action = visualization_msgs::msg::Marker::ADD;
+    selection_marker_.points.clear();
+    selection_marker_.pose.position.y = gimbal_cmd.distance * sin(gimbal_cmd.yaw * M_PI / 180);
+    selection_marker_.pose.position.x = gimbal_cmd.distance * cos(gimbal_cmd.yaw * M_PI / 180);
+    selection_marker_.pose.position.z = gimbal_cmd.distance * sin(gimbal_cmd.pitch * M_PI / 180);
+
     trajectory_marker_.action = visualization_msgs::msg::Marker::ADD;
-    trajectory_marker_.header.frame_id = "gimbal_link";
-    trajectory_marker_.header.stamp = this->now();
     trajectory_marker_.points.clear();
-    for (const auto &point :
-         solver_->getTrajectory(gimbal_cmd.distance, gimbal_cmd.pitch * M_PI / 180)) {
+    trajectory_marker_.header.frame_id = "gimbal_link";
+    for (const auto &point : solver_->getTrajectory()) {
       geometry_msgs::msg::Point p;
       p.x = point.first;
       p.z = point.second;
       trajectory_marker_.points.emplace_back(p);
+    }
+    if (gimbal_cmd.fire_advice) {
+      trajectory_marker_.color.r = 0;
+      trajectory_marker_.color.g = 1;
+      trajectory_marker_.color.b = 0;
+    } else {
+      trajectory_marker_.color.r = 1;
+      trajectory_marker_.color.g = 1;
+      trajectory_marker_.color.b = 1;
     }
 
   } else {
@@ -412,18 +424,43 @@ void ArmorSolverNode::publishMarkers(const rm_interfaces::msg::Target &target_ms
     angular_v_marker_.action = visualization_msgs::msg::Marker::DELETE;
     armors_marker_.action = visualization_msgs::msg::Marker::DELETE;
     trajectory_marker_.action = visualization_msgs::msg::Marker::DELETE;
-    aimming_line_marker_.action = visualization_msgs::msg::Marker::DELETE;
+    selection_marker_.action = visualization_msgs::msg::Marker::DELETE;
   }
-
-  visualization_msgs::msg::MarkerArray marker_array;
 
   marker_array.markers.emplace_back(position_marker_);
   marker_array.markers.emplace_back(trajectory_marker_);
   marker_array.markers.emplace_back(linear_v_marker_);
   marker_array.markers.emplace_back(angular_v_marker_);
   marker_array.markers.emplace_back(armors_marker_);
-  marker_array.markers.emplace_back(aimming_line_marker_);
+  marker_array.markers.emplace_back(selection_marker_);
   marker_pub_->publish(marker_array);
+}
+
+void ArmorSolverNode::setModeCallback(
+  const std::shared_ptr<rm_interfaces::srv::SetMode::Request> request,
+  std::shared_ptr<rm_interfaces::srv::SetMode::Response> response) {
+  response->success = true;
+
+  VisionMode mode = static_cast<VisionMode>(request->mode);
+  std::string mode_name = visionModeToString(mode);
+  if (mode_name == "UNKNOWN") {
+    FYT_ERROR("armor_solver", "Invalid mode: {}", request->mode);
+    return;
+  }
+
+  switch (mode) {
+    case VisionMode::AUTO_AIM_RED:
+    case VisionMode::AUTO_AIM_BLUE: {
+      enable_ = true;
+      break;
+    }
+    default: {
+      enable_ = false;
+      break;
+    }
+  }
+
+  FYT_WARN("armor_solver", "Set Mode to {}", visionModeToString(mode));
 }
 
 }  // namespace fyt::auto_aim

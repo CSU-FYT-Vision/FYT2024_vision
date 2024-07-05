@@ -40,6 +40,7 @@
 #include "rm_interfaces/msg/armors.hpp"
 #include "rm_interfaces/msg/measurement.hpp"
 #include "rm_interfaces/msg/target.hpp"
+#include "rm_interfaces/srv/set_mode.hpp"
 #include "rm_utils/heartbeat.hpp"
 #include "rm_utils/logger/log.hpp"
 
@@ -52,9 +53,15 @@ public:
 private:
   void armorsCallback(const rm_interfaces::msg::Armors::SharedPtr armors_ptr);
 
+  void initMarkers() noexcept;
+
   void publishMarkers(const rm_interfaces::msg::Target &target_msg,
                       const rm_interfaces::msg::GimbalCmd &gimbal_cmd) noexcept;
 
+
+  void setModeCallback(const std::shared_ptr<rm_interfaces::srv::SetMode::Request> request,
+                       std::shared_ptr<rm_interfaces::srv::SetMode::Response> response);
+  
   bool debug_mode_;
 
   // Heartbeat
@@ -78,6 +85,7 @@ private:
   std::shared_ptr<tf2_ros::Buffer> tf2_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf2_listener_;
   message_filters::Subscriber<rm_interfaces::msg::Armors> armors_sub_;
+  rm_interfaces::msg::Target armor_target_;
   std::shared_ptr<tf2_filter> tf2_filter_;
 
   // Measurement publisher
@@ -86,6 +94,12 @@ private:
   // Publisher
   rclcpp::Publisher<rm_interfaces::msg::Target>::SharedPtr target_pub_;
   rclcpp::Publisher<rm_interfaces::msg::GimbalCmd>::SharedPtr gimbal_pub_;
+  rclcpp::TimerBase::SharedPtr pub_timer_;
+  void timerCallback();
+  
+  // Enable/Disable Armor Solver
+  bool enable_;
+  rclcpp::Service<rm_interfaces::srv::SetMode>::SharedPtr set_mode_srv_;
 
   // Visualization marker publisher
   visualization_msgs::msg::Marker position_marker_;
@@ -93,7 +107,7 @@ private:
   visualization_msgs::msg::Marker angular_v_marker_;
   visualization_msgs::msg::Marker trajectory_marker_;
   visualization_msgs::msg::Marker armors_marker_;
-  visualization_msgs::msg::Marker aimming_line_marker_;
+  visualization_msgs::msg::Marker selection_marker_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
 };
 

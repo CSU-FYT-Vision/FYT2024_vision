@@ -74,7 +74,7 @@ void Tracker::init(const Armors::SharedPtr &armors_msg) noexcept {
 
 void Tracker::update(const Armors::SharedPtr &armors_msg) noexcept {
   // KF predict
-  Eigen::VectorXd ekf_prediction = ekf.predict();
+  Eigen::VectorXd ekf_prediction = ekf->predict();
 
   bool matched = false;
   // Use KF prediction as default target state if no matched armor is found
@@ -115,10 +115,6 @@ void Tracker::update(const Armors::SharedPtr &armors_msg) noexcept {
       }
     }
 
-    // Store tracker info
-    info_position_diff = min_position_diff;
-    info_yaw_diff = yaw_diff;
-
     // Check if the distance and yaw difference of closest armor are within the
     // threshold
     if (min_position_diff < max_match_distance_ && yaw_diff < max_match_yaw_diff_) {
@@ -128,7 +124,7 @@ void Tracker::update(const Armors::SharedPtr &armors_msg) noexcept {
       // Update EKF
       double measured_yaw = orientationToYaw(tracked_armor.pose.orientation);
       measurement = Eigen::Vector4d(p.x, p.y, p.z, measured_yaw);
-      target_state = ekf.update(measurement);
+      target_state = ekf->update(measurement);
     } else if (same_id_armors_count == 1 && yaw_diff > max_match_yaw_diff_) {
       // Matched armor not found, but there is only one armor with the same id
       // and yaw has jumped, take this case as the target is spinning and armor
@@ -143,10 +139,10 @@ void Tracker::update(const Armors::SharedPtr &armors_msg) noexcept {
   // Prevent radius from spreading
   if (target_state(8) < 0.12) {
     target_state(8) = 0.12;
-    ekf.setState(target_state);
+    ekf->setState(target_state);
   } else if (target_state(8) > 0.4) {
     target_state(8) = 0.4;
-    ekf.setState(target_state);
+    ekf->setState(target_state);
   }
 
   // Tracking state machine
@@ -200,7 +196,7 @@ void Tracker::initEKF(const Armor &a) noexcept {
   dz = 0, another_r = r;
   target_state << xc, 0, yc, 0, za, 0, yaw, 0, r;
 
-  ekf.setState(target_state);
+  ekf->setState(target_state);
 }
 
 void Tracker::handleArmorJump(const Armor &current_armor) noexcept {
@@ -237,7 +233,7 @@ void Tracker::handleArmorJump(const Armor &current_armor) noexcept {
     FYT_WARN("armor_solver", "State wrong!");
   }
 
-  ekf.setState(target_state);
+  ekf->setState(target_state);
 }
 
 double Tracker::orientationToYaw(const geometry_msgs::msg::Quaternion &q) noexcept {

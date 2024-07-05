@@ -43,6 +43,8 @@
 #include "rm_utils/math/pnp_solver.hpp"
 #include "rm_utils/math/trajectory_compensator.hpp"
 #include "rune_solver/curve_fitter.hpp"
+#include "rune_solver/motion_model.hpp"
+#include "rune_solver/motion_model.hpp"
 #include "rune_solver/types.hpp"
 
 namespace fyt::rune {
@@ -99,7 +101,7 @@ public:
   std::unique_ptr<PnPSolver> pnp_solver;
   std::unique_ptr<TrajectoryCompensator> trajectory_compensator;
   std::unique_ptr<CurveFitter> curve_fitter;
-  ExtendedKalmanFilter ekf;
+  std::unique_ptr<RuneCenterEKF> ekf;
 
   RuneSolverParams rune_solver_params;
 

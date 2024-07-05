@@ -318,9 +318,14 @@ bool RuneDetector::processCallback(const cv::Mat resized_img,
                           blob.ptr(0));
 
   // Start inference
+  // Lock because of the thread race condition within the openvino library
+  mtx_.lock();
   auto infer_request = compiled_model_->create_infer_request();
+  mtx_.unlock();
   infer_request.set_input_tensor(input_tensor);
+  mtx_.lock();
   infer_request.infer();
+  mtx_.unlock();
 
   auto output = infer_request.get_output_tensor();
 
@@ -390,13 +395,9 @@ std::tuple<cv::Point2f, cv::Mat> RuneDetector::detectRTag(const cv::Mat &img,
   }
 
   // Create ROI
-  const int roi_x = (prior.x - 100) > 0 ? (prior.x - 100) : 0;
-  const int roi_y = (prior.y - 100) > 0 ? (prior.y - 100) : 0;
-  const cv::Point roi_tl = cv::Point(roi_x, roi_y);
-  const int roi_w = (roi_tl.x + 200) > img.cols ? (img.cols - roi_tl.x) : 200;
-  const int roi_h = (roi_tl.y + 200) > img.rows ? (img.rows - roi_tl.y) : 200;
-  const cv::Rect roi = cv::Rect(roi_tl, cv::Size(roi_w, roi_h));
-  const cv::Point2f prior_in_roi = prior - cv::Point2f(roi_tl);
+  cv::Rect roi =
+    cv::Rect(prior.x - 100, prior.y - 100, 200, 200) & cv::Rect(0, 0, img.cols, img.rows);
+  const cv::Point2f prior_in_roi = prior - cv::Point2f(roi.tl());
 
   cv::Mat img_roi = img(roi);
 
@@ -418,21 +419,24 @@ std::tuple<cv::Point2f, cv::Mat> RuneDetector::detectRTag(const cv::Mat &img,
                            return cv::pointPolygonTest(contour, p, false) >= 0;
                          });
 
+  // For visualization
   cv::cvtColor(binary_img, binary_img, cv::COLOR_GRAY2BGR);
+
   if (it == contours.end()) {
     return {prior, binary_img};
-  } else {
-    cv::drawContours(binary_img, contours, it - contours.begin(), cv::Scalar(0, 255, 0), 2);
-    cv::Point2f center =
-      std::accumulate(it->begin(),
-                      it->end(),
-                      cv::Point2f(0, 0),
-                      [n = static_cast<float>(it->size())](cv::Point2f a, auto b) {
-                        return a + cv::Point2f(b.x, b.y) / n;
-                      });
-    center += cv::Point2f(roi_tl);
-    return {center, binary_img};
   }
+
+  cv::drawContours(binary_img, contours, it - contours.begin(), cv::Scalar(0, 255, 0), 2);
+
+  cv::Point2f center = std::accumulate(it->begin(),
+                                       it->end(),
+                                       cv::Point2f(0, 0),
+                                       [n = static_cast<float>(it->size())](cv::Point2f a, auto b) {
+                                         return a + cv::Point2f(b.x, b.y) / n;
+                                       });
+  center += cv::Point2f(roi.tl());
+
+  return {center, binary_img};
 }
 
 }  // namespace fyt::rune

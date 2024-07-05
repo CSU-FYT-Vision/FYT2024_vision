@@ -33,6 +33,7 @@
 #include "rm_interfaces/msg/armors.hpp"
 #include "rm_interfaces/msg/target.hpp"
 #include "rm_utils/math/extended_kalman_filter.hpp"
+#include "armor_solver/motion_model.hpp"
 
 namespace fyt::auto_aim {
 
@@ -56,7 +57,7 @@ public:
     TEMP_LOST,
   } tracker_state;
 
-  ExtendedKalmanFilter ekf;
+  std::unique_ptr<RobotStateEKF> ekf;
 
   int tracking_thres;  // frame
   int lost_thres;      // second
@@ -66,9 +67,6 @@ public:
   ArmorsNum tracked_armors_num;
   Eigen::VectorXd measurement;
   Eigen::VectorXd target_state;
-
-  double info_position_diff;
-  double info_yaw_diff;
 
   // To store another pair of armors message
   double dz, another_r;

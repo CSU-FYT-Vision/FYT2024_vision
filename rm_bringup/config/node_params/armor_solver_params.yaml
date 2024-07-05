@@ -2,6 +2,7 @@
   ros__parameters:
     debug: true
     target_frame: odom
+    frequency: 250
     max_armor_distance: 10.0
 
     ekf:

@@ -247,36 +247,37 @@ cv::Mat Detector::getAllNumbersImage() const noexcept {
 void Detector::drawResults(cv::Mat &img) const noexcept {
   // Draw Lights
 
-  for (const auto &light : lights_) {
-    auto line_color =
-      light.color == EnemyColor::RED ? cv::Scalar(0, 255, 255) : cv::Scalar(255, 255, 0);
-    // cv::ellipse(img, light, line_color, 2);
-    cv::line(img, light.top, light.bottom, line_color, 1);
-  }
+  // for (const auto &light : lights_) {
+  //   auto line_color =
+  //     light.color == EnemyColor::RED ? cv::Scalar(0, 255, 255) : cv::Scalar(255, 255, 0);
+  //   // cv::ellipse(img, light, line_color, 2);
+  //   cv::line(img, light.top, light.bottom, line_color, 1);
+  // }
 
   // Draw armors
   for (const auto &armor : armors_) {
-    cv::line(img, armor.left_light.top, armor.right_light.bottom, cv::Scalar(0, 255, 0), 1);
-    cv::line(img, armor.left_light.bottom, armor.right_light.top, cv::Scalar(0, 255, 0), 1);
+    // cv::line(img, armor.left_light.top, armor.right_light.bottom, cv::Scalar(0, 255, 0), 1);
+    // cv::line(img, armor.left_light.bottom, armor.right_light.top, cv::Scalar(0, 255, 0), 1);
 
-    // cv::line(img, armor.left_light.top, armor.left_light.bottom,
-    // cv::Scalar(0, 255, 0), 1, cv::LINE_AA); cv::line(img,
-    // armor.right_light.bottom, armor.right_light.top, cv::Scalar(0, 255, 0),
-    // 1, cv::LINE_AA); cv::line(img, armor.left_light.top,
-    // armor.right_light.top, cv::Scalar(0, 255, 0), 1, cv::LINE_AA);
-    // cv::line(img, armor.right_light.bottom, armor.left_light.bottom,
-    // cv::Scalar(0, 255, 0), 1, cv::LINE_AA);
+    cv::line(
+      img, armor.left_light.top, armor.left_light.bottom, cv::Scalar(0, 255, 0), 1, cv::LINE_AA);
+    cv::line(
+      img, armor.right_light.bottom, armor.right_light.top, cv::Scalar(0, 255, 0), 1, cv::LINE_AA);
+    cv::line(
+      img, armor.left_light.top, armor.right_light.top, cv::Scalar(0, 255, 0), 1, cv::LINE_AA);
+    cv::line(img,
+             armor.right_light.bottom,
+             armor.left_light.bottom,
+             cv::Scalar(0, 255, 0),
+             1,
+             cv::LINE_AA);
   }
   // Show numbers and confidence
   for (const auto &armor : armors_) {
-    std::string text = fmt::format("{} {}", armorTypeToString(armor.type), armor.classfication_result);
-    cv::putText(img,
-                text,
-                armor.left_light.top,
-                cv::FONT_HERSHEY_SIMPLEX,
-                0.8,
-                cv::Scalar(0, 255, 255),
-                2);
+    std::string text =
+      fmt::format("{} {}", armorTypeToString(armor.type), armor.classfication_result);
+    cv::putText(
+      img, text, armor.left_light.top, cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 255), 2);
   }
 }
 

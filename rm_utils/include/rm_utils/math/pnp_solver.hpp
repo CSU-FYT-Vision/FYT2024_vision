@@ -18,6 +18,7 @@
 
 #include <Eigen/Dense>
 #include <opencv2/calib3d.hpp>
+#include <opencv2/imgproc.hpp>
 #include <unordered_map>
 #include <vector>
 
