@@ -14,7 +14,7 @@
 *  `armor_detector/result_img` (`sensor_msgs/msg/Image`) - 识别结果可视化图像
 *  `armor_detector/binary_img` (`sensor_msgs/msg/Image`) - 二值化图像
 *  `armor_detector/number_img` (`sensor_msgs/msg/Image`) - 数字识别roi
-  
+
 ### 订阅话题
 
 *  `image_raw` (`sensor_msgs/msg/Image`) - 相机图像
@@ -23,7 +23,7 @@
 ### 服务
 
 *  `armor_detector/set_mode` (`rm_interfaces/srv/SetMode`) - 设置模式
-  
+
 ### 参数 
 
 * `debug` (`bool`, default: false) - 是否开启调试模式
@@ -109,41 +109,4 @@
 
 ## BA优化
 
-根据RoboMaster机器人制作规范，非平衡机器人在平地上，每块装甲板相对地面坐标系的姿态角应为Roll=0, Pitch=15, Yaw=$\theta$，其中只有Yaw角度是未知的。可以根据这个特征求取装甲板的Yaw角度，参考上海交通大学2023年全国赛青工会上的展示。我们使用BA优化的方式来求取Yaw角度，BA优化是一种特殊的最小二乘问题，其通过最小化重投影误差来求取相机位姿。
-
-装甲板Yaw角度为$\theta$，装甲板系下相机的位姿为$(R^{camera}_{armor}, t^{camera}_{armor})$，IMU系下相机姿态为$R^{camera}_{imu}$，相机内参为$K$，装甲板第$i$个角点在装甲板坐标系下为$P^{armor}_i$
-
-> Yaw的初始值可用PnP的结果
-
-则有
-$$
-
-R^{camera}_{armor} = R^{camera}_{imu} · R^{imu}_{armor} = R^{camera}_{imu} · R(Z, \theta_k) · R(Y,15^{\circ}) · R(X,0)
-
-$$
-
-
-则装甲板角点在图像中的未归一化投影坐标为：
-
-
-$$
-
-P^{image}_i = K · (R^{camera}_{armor} · P^{armor}_i + t^{camera}_{armor})
-
-$$
-
-设每个角点在图像中识别到的坐标为$P^{detected}_i$，则构建误差函数：
-
-$$
-
-e(\theta) = \sum_{i=1}^{n}||P^{detected}_i - (P^{image}_i / P^{image}_i.z)||^2
-
-$$
-
-使用G2O库进行优化，得到最优的Yaw角度$\hat{\theta}$
-
-$$
-
-\hat{\theta} = argmin_{\theta} e(\theta)
-
-$$
+![](docs/BA.png)
