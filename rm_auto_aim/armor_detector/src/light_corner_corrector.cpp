@@ -101,6 +101,10 @@ SymmetryAxis LightCornerCorrector::findSymmetryAxis(const cv::Mat &gray_img, con
   // Normalize the axis
   axis = axis / cv::norm(axis);
 
+  if (axis.y > 0) {
+    axis = -axis;
+  }
+
   return SymmetryAxis{.centroid = centroid, .direction = axis, .mean_val = mean_val};
 }
 
@@ -141,7 +145,7 @@ cv::Point2f LightCornerCorrector::findCorner(const cv::Mat &gray_img,
     for (float x = x0 + dx, y = y0 + dy; distance(x, y, x0, y0) < L * (END - START);
          x += dx, y += dy) {
       cv::Point2f cur = cv::Point2f(x, y);
-      if (!inImage(cv::Point(cur))) {
+      if (!inImage(cur)) {
         break;
       }
 

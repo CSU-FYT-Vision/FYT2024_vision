@@ -110,3 +110,32 @@
 ## BA优化
 
 ![](docs/BA.png)
+
+<!-- 根据RoboMaster机器人制作规范，非平衡机器人在平地上，每块装甲板相对地面坐标系的姿态角应为Roll=0，Pitch=15°，Yaw=$\theta$，其中只有Yaw角度是未知的。可以根据这个特征求取装甲板的Yaw角度，参考上海交通大学2023年全国赛青工会上的展示。
+
+我们使用BA优化的方式来求取Yaw角度，BA（光束法平差，Bundle Adjustment）优化是一种特殊的最小二乘问题，其通过最小化重投影误差来求取相机位姿。
+
+假设装甲板Yaw角度为$\theta$，相机系下装甲板位姿为$(R^{camera}_{armor},t^{camera}_{armor})$，IMU系下相机姿态为$R^{imu}_{camera}$，相机内参为$K$，装甲板第$i$个角点在装甲板坐标系下为$P^{armor}_i$
+
+则易得$R^{camera}_{armor}$为$\theta$的一元函数值
+$$
+R^{camera}_{armor} = {R^{imu}_{camera}}^T ·R^{imu}_{armor}=R^{camera}_{imu}·R(Z,\theta)·R(Y,15°)·R(X,0)=f(\theta)
+$$
+装甲板角点在图像中的未归一化投影坐标为：
+$$
+P^{img}_i=K·(R^{camera}_{armor}·P^{armor}_i+t^{camera}_{armor})
+$$
+其中$t^{camera}_{armor}$可用PnP的结果
+
+设每个角点在图像中识别到的坐标为$P^{det}_i$，则有误差函数：
+$$
+e(\theta)=\sum^{n}_{i}||P^{det}_i-\frac{P^{img}_i}{P^{img}_i.z}||^2
+$$
+最小化该误差函数即可得到优化后的Yaw角度$\hat{\theta}$
+$$
+\hat{\theta}={argmin}_{\theta} \space e(\theta)
+$$
+
+
+可以使用各类数值优化方法，例如最速下降、高斯牛顿等方法求解，但更推荐使用一些现成的优化库，例如G2O、Ceres实现该问题的求解
+ -->
