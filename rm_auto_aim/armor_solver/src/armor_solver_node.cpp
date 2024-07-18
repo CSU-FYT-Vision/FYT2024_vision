@@ -156,6 +156,10 @@ void ArmorSolverNode::timerCallback() {
   if (solver_ == nullptr) {
     return;
   }
+  
+  if (!enable_) {
+    return;
+  }
 
   // Init message
   rm_interfaces::msg::GimbalCmd control_msg;
