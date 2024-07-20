@@ -8,6 +8,7 @@ float64 yaw
 float64 v_yaw
 float64 radius_1
 float64 radius_2
-float64 dz
+float64 d_za
+float64 d_zc
 float64 yaw_diff
 float64 position_diff

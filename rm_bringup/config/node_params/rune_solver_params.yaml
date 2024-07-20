@@ -1,7 +1,6 @@
 /**:
   ros__parameters:
     debug: true
-    frequency: 250
     auto_type_determined: true 
     predict_time: 0.0
     compensator_type: resistance

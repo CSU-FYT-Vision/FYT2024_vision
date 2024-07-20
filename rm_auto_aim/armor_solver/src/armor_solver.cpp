@@ -94,7 +94,7 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
 
   // Choose the best armor to shoot
   std::vector<Eigen::Vector3d> armor_positions = getArmorPositions(
-    target_position, target_yaw, target.radius_1, target.radius_2, target.dz, target.armors_num);
+    target_position, target_yaw, target.radius_1, target.radius_2, target.d_zc, target.d_za, target.armors_num);
   int idx =
     selectBestArmor(armor_positions, target_position, target_yaw, target.v_yaw, target.armors_num);
   auto chosen_armor_position = armor_positions.at(idx);
@@ -135,7 +135,8 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
                                             target_yaw,
                                             target.radius_1,
                                             target.radius_2,
-                                            target.dz,
+                                            target.d_zc,
+                                            target.d_za,
                                             target.armors_num);
         chosen_armor_position = armor_positions.at(idx);
         gimbal_cmd.distance = chosen_armor_position.norm();
@@ -197,7 +198,8 @@ std::vector<Eigen::Vector3d> Solver::getArmorPositions(const Eigen::Vector3d &ta
                                                        const double target_yaw,
                                                        const double r1,
                                                        const double r2,
-                                                       const double dz,
+                                                       const double d_zc,
+                                                       const double d_za,
                                                        const size_t armors_num) const noexcept {
   auto armor_positions = std::vector<Eigen::Vector3d>(armors_num, Eigen::Vector3d::Zero());
   // Calculate the position of each armor
@@ -207,11 +209,11 @@ std::vector<Eigen::Vector3d> Solver::getArmorPositions(const Eigen::Vector3d &ta
     double temp_yaw = target_yaw + i * (2 * M_PI / armors_num);
     if (armors_num == 4) {
       r = is_current_pair ? r1 : r2;
-      target_dz = is_current_pair ? 0 : dz;
+      target_dz = d_zc + (is_current_pair ? 0 : d_za);
       is_current_pair = !is_current_pair;
     } else {
       r = r1;
-      target_dz = dz;
+      target_dz = d_zc;
     }
     armor_positions[i] =
       target_center + Eigen::Vector3d(-r * cos(temp_yaw), -r * sin(temp_yaw), target_dz);
@@ -239,7 +241,7 @@ int Solver::selectBestArmor(const std::vector<Eigen::Vector3d> &armor_positions,
   // clang-format on
   Eigen::Matrix2d R_center2armor = R_odom2center.transpose() * R_odom2armor;
 
-  // Equal to (beta - alpha) in most cases
+  // Equal to (alpha - beta) in most cases
   double decision_angle = -std::asin(R_center2armor(0, 1));
 
   // Angle thresh of the armor jump

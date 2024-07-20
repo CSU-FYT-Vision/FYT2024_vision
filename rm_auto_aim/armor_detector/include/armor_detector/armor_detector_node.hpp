@@ -65,11 +65,10 @@ private:
   std::unique_ptr<Detector> initDetector();
   std::vector<Armor> detectArmors(const sensor_msgs::msg::Image::ConstSharedPtr &img_msg);
 
-  // get RPY from rvec in imu frame
-  double rvecToRPY(const cv::Mat & rvec, int axis) const noexcept;
-
   // Select the best PnP solution according to the pitch angle
-  void PnPSolutionsSelection(const Armor & armor, cv::Mat & rvec, cv::Mat &tvec) noexcept;
+  void PnPSolutionsSelection(Armor &armor,
+                             const std::vector<cv::Mat> &rvecs,
+                             const std::vector<cv::Mat> &tvecs) noexcept;
 
   void createDebugPublishers() noexcept;
   void destroyDebugPublishers() noexcept;
@@ -118,6 +117,7 @@ private:
   // ReceiveData subscripiton
   std::string odom_frame_;
   Eigen::Matrix3d imu_to_camera_;
+  Eigen::Matrix3d gimbal_to_camera_;
   std::shared_ptr<tf2_ros::Buffer> tf2_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf2_listener_;
   geometry_msgs::msg::TransformStamped odom_to_gimbal;
@@ -125,7 +125,6 @@ private:
   // Enable/Disable Armor Detector
   rclcpp::Service<rm_interfaces::srv::SetMode>::SharedPtr set_mode_srv_;
   bool use_ba_;
-  bool pnp_solution_selection_;
 
   // Debug information
   bool debug_;

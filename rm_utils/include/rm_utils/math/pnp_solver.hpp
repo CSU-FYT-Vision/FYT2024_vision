@@ -35,48 +35,62 @@ public:
 
   // Get 3d position of the object coord system using PnP algorithm
   template <class InputArray>
-  bool solvePnP(const InputArray &image_points,
-                cv::Mat &rvec,
-                cv::Mat &tvec,
-                const std::string &coord_frame_name) {
-    rvecs_.clear();
-    tvecs_.clear();
-    if (auto it = object_points_map_.find(coord_frame_name); it != object_points_map_.end()) {
-      auto object_points = it->second;
+  bool solvePnPGeneric(const InputArray &image_points,
+                       std::vector<cv::Mat> &rvecs,
+                       std::vector<cv::Mat> &tvecs,
+                       const std::string &coord_frame_name) {
+    rvecs.clear();
+    tvecs.clear();
+    if (object_points_map_.find(coord_frame_name) != object_points_map_.end()) {
+      const auto &object_points = object_points_map_[coord_frame_name];
       int solutions = cv::solvePnPGeneric(object_points,
                                           image_points,
                                           camera_matrix_,
                                           distortion_coefficients_,
-                                          rvecs_,
-                                          tvecs_,
+                                          rvecs,
+                                          tvecs,
                                           false,
                                           method_);
-      if (solutions > 0) {
-        int rdepth = rvec.empty() ? CV_64F : rvec.depth();
-        int tdepth = tvec.empty() ? CV_64F : tvec.depth();
-        rvecs_[0].convertTo(rvec, rdepth);
-        tvecs_[0].convertTo(tvec, tdepth);
-      }
       return solutions > 0;
     } else {
       return false;
     }
   }
 
-  std::vector<std::vector<cv::Mat>> getAllSolutions() const noexcept { return {rvecs_, tvecs_}; }
+  // Get 3d position of the object coord system using PnP algorithm
+  template <class InputArray>
+  bool solvePnP(const InputArray &image_points,
+                cv::Mat &rvec,
+                cv::Mat &tvec,
+                const std::string &coord_frame_name) {
+    if (object_points_map_.find(coord_frame_name) != object_points_map_.end()) {
+      const auto &object_points = object_points_map_[coord_frame_name];
+      return cv::solvePnP(object_points,
+                          image_points,
+                          camera_matrix_,
+                          distortion_coefficients_,
+                          rvec,
+                          tvec,
+                          false,
+                          method_);
+    } else {
+      return false;
+    }
+  }
 
   // Calculate the distance between armor center and image center
   float calculateDistanceToCenter(const cv::Point2f &image_point) const noexcept;
 
-  static Eigen::VectorXd getPose(const cv::Mat &rvec, const cv::Mat &tvec) noexcept;
+  double calculateReprojectionError(const std::vector<cv::Point2f> &image_points,
+                                    const cv::Mat &rvec,
+                                    const cv::Mat &tvec,
+                                    const std::string &coord_frame_name) const noexcept;
 
 private:
   std::unordered_map<std::string, std::vector<cv::Point3f>> object_points_map_;
   cv::Mat camera_matrix_;
   cv::Mat distortion_coefficients_;
   cv::SolvePnPMethod method_;
-  std::vector<cv::Mat> rvecs_;
-  std::vector<cv::Mat> tvecs_;
 };
 }  // namespace fyt
 #endif  // RM_UTILS_PNP_SOLVER_HPP_

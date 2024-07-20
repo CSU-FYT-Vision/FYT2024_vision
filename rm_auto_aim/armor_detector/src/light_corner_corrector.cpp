@@ -27,6 +27,7 @@ void LightCornerCorrector::correctCorners(Armor &armor, const cv::Mat &gray_img)
     // Find the symmetry axis of the light
     SymmetryAxis left_axis = findSymmetryAxis(gray_img, armor.left_light);
     armor.left_light.center = left_axis.centroid;
+    armor.left_light.axis = left_axis.direction;
     // Find the corner of the light
     if (cv::Point2f t = findCorner(gray_img, armor.left_light, left_axis, "top"); t.x > 0) {
       armor.left_light.top = t;
@@ -40,6 +41,7 @@ void LightCornerCorrector::correctCorners(Armor &armor, const cv::Mat &gray_img)
     // Find the symmetry axis of the light
     SymmetryAxis right_axis = findSymmetryAxis(gray_img, armor.right_light);
     armor.right_light.center = right_axis.centroid;
+    armor.right_light.axis = right_axis.direction;
     // Find the corner of the light
     if (cv::Point2f t = findCorner(gray_img, armor.right_light, right_axis, "top"); t.x > 0) {
       armor.right_light.top = t;
@@ -145,7 +147,7 @@ cv::Point2f LightCornerCorrector::findCorner(const cv::Mat &gray_img,
     for (float x = x0 + dx, y = y0 + dy; distance(x, y, x0, y0) < L * (END - START);
          x += dx, y += dy) {
       cv::Point2f cur = cv::Point2f(x, y);
-      if (!inImage(cur)) {
+      if (!inImage(cv::Point(cur))) {
         break;
       }
 

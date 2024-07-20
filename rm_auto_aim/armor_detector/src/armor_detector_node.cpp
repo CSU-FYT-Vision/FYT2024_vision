@@ -63,7 +63,6 @@ ArmorDetectorNode::ArmorDetectorNode(const rclcpp::NodeOptions &options)
 
   // Tricks to make pose more accurate
   use_ba_ = this->declare_parameter("use_ba", true);
-  pnp_solution_selection_ = this->declare_parameter("pnp_solution_selection", false);
 
   // Armors Publisher
   armors_pub_ = this->create_publisher<rm_interfaces::msg::Armors>("armor_detector/armors",
@@ -72,6 +71,8 @@ ArmorDetectorNode::ArmorDetectorNode(const rclcpp::NodeOptions &options)
   // Transform initialize
   odom_frame_ = this->declare_parameter("target_frame", "odom");
   imu_to_camera_ = Eigen::Matrix3d::Identity();
+  gimbal_to_camera_ = Eigen::Matrix3d::Identity();
+  gimbal_to_camera_ << 0, 0, 1, -1, 0, 0, 0, -1, 0;
 
   // Visualization Marker Publisher
   // See http://wiki.ros.org/rviz/DisplayTypes/Marker
@@ -185,24 +186,16 @@ void ArmorDetectorNode::imageCallback(const sensor_msgs::msg::Image::ConstShared
     rm_interfaces::msg::Armor armor_msg;
     // Get the pose of each armor
     for (auto &armor : armors) {
-      cv::Mat rvec(3, 1, CV_64F), tvec(3, 1, CV_64F);
-      cv::Mat rotation_matrix(3, 3, CV_64F);
+      std::vector<cv::Mat> rvecs, tvecs;
 
       // Use PnP to get the initial pose information
-      if (pnp_solver_->solvePnP(
-            armor.landmarks(), rvec, tvec, (armor.type == ArmorType::SMALL ? "small" : "large"))) {
-        armor.roll = rvecToRPY(rvec, 0) * 180 / M_PI;
+      if (pnp_solver_->solvePnPGeneric(armor.landmarks(),
+                                       rvecs,
+                                       tvecs,
+                                       (armor.type == ArmorType::SMALL ? "small" : "large"))) {
+        PnPSolutionsSelection(armor, rvecs, tvecs);
+
         armor.imu2camera = imu_to_camera_;
-
-        // Select the best PnP solution according to the pitch angle
-        // Optimize armor parallel to the ground only
-        if (pnp_solution_selection_ && std::abs(armor.roll) < 10) {
-          PnPSolutionsSelection(armor, rvec, tvec);
-        }
-
-        cv::Rodrigues(rvec, rotation_matrix);
-        armor.rmat = rotation_matrix.clone();
-        armor.tvec = tvec.clone();
 
         if (use_ba_) {
           // Optimize armor parallel to the ground only
@@ -219,7 +212,7 @@ void ArmorDetectorNode::imageCallback(const sensor_msgs::msg::Image::ConstShared
 
           // Use BA alogorithm to optimize the pose from PnP
           // solveBa() will modify the rotation_matrix
-          ba_solver_->solveBa(tracked_armors_, rotation_matrix);
+          ba_solver_->solveBa(tracked_armors_, armor.rmat);
         }
 
         // Fill basic info
@@ -227,20 +220,20 @@ void ArmorDetectorNode::imageCallback(const sensor_msgs::msg::Image::ConstShared
         armor_msg.number = armor.number;
 
         // Fill pose
-        armor_msg.pose.position.x = tvec.at<double>(0);
-        armor_msg.pose.position.y = tvec.at<double>(1);
-        armor_msg.pose.position.z = tvec.at<double>(2);
+        armor_msg.pose.position.x = armor.tvec.at<double>(0);
+        armor_msg.pose.position.y = armor.tvec.at<double>(1);
+        armor_msg.pose.position.z = armor.tvec.at<double>(2);
 
         // rotation matrix to quaternion
-        tf2::Matrix3x3 tf2_rotation_matrix(rotation_matrix.at<double>(0, 0),
-                                           rotation_matrix.at<double>(0, 1),
-                                           rotation_matrix.at<double>(0, 2),
-                                           rotation_matrix.at<double>(1, 0),
-                                           rotation_matrix.at<double>(1, 1),
-                                           rotation_matrix.at<double>(1, 2),
-                                           rotation_matrix.at<double>(2, 0),
-                                           rotation_matrix.at<double>(2, 1),
-                                           rotation_matrix.at<double>(2, 2));
+        tf2::Matrix3x3 tf2_rotation_matrix(armor.rmat.at<double>(0, 0),
+                                           armor.rmat.at<double>(0, 1),
+                                           armor.rmat.at<double>(0, 2),
+                                           armor.rmat.at<double>(1, 0),
+                                           armor.rmat.at<double>(1, 1),
+                                           armor.rmat.at<double>(1, 2),
+                                           armor.rmat.at<double>(2, 0),
+                                           armor.rmat.at<double>(2, 1),
+                                           armor.rmat.at<double>(2, 2));
         tf2::Quaternion tf2_quaternion;
         tf2_rotation_matrix.getRotation(tf2_quaternion);
         armor_msg.pose.orientation.x = tf2_quaternion.x();
@@ -377,45 +370,72 @@ std::vector<Armor> ArmorDetectorNode::detectArmors(
   return armors;
 }
 
-void ArmorDetectorNode::PnPSolutionsSelection(const Armor &armor,
-                                              cv::Mat &rvec,
-                                              cv::Mat &tvec) noexcept {
-  // From all possible pnp solutions, we choose the one with closest pitch to 15 degree
-  auto pnp_solutions = pnp_solver_->getAllSolutions();
-  auto rvecs = std::move(pnp_solutions.at(0));
-  auto tvecs = std::move(pnp_solutions.at(1));
+void ArmorDetectorNode::PnPSolutionsSelection(Armor &armor,
+                                              const std::vector<cv::Mat> &rvecs,
+                                              const std::vector<cv::Mat> &tvecs) noexcept {
+  constexpr float PROJECT_ERR_THRES = 3.0;
 
-  size_t best_idx = 0;
-  double prior = armor.number == "outpost" ? -FIFTTEN_DEGREE_RAD : FIFTTEN_DEGREE_RAD;
-  double best_diff = std::abs(rvecToRPY(rvecs[0], 1) - prior);
-  for (size_t i = 0; i < rvecs.size(); i++) {
-    double diff = std::abs(rvecToRPY(rvecs[i], 1) - prior);
-    if (diff < best_diff) {
-      best_diff = diff;
-      best_idx = i;
-    }
+  // 返回相机系下的RPY角
+  auto rvecToRPY = [this](const Eigen::Matrix3d &R) {
+    // Transform to imu frame
+    Eigen::Quaterniond q(this->gimbal_to_camera_ * R);
+    // Get armor yaw
+    tf2::Quaternion tf_q(q.x(), q.y(), q.z(), q.w());
+    std::array<double, 3> rpy;
+    tf2::Matrix3x3(tf_q).getRPY(rpy[0], rpy[1], rpy[2]);
+    return rpy;
+  };
+
+  // 获取这两个解
+  cv::Mat rvec1 = rvecs.at(0);
+  cv::Mat tvec1 = tvecs.at(0);
+  cv::Mat rvec2 = rvecs.at(1);
+  cv::Mat tvec2 = tvecs.at(1);
+
+  // 将旋转向量转换为旋转矩阵
+  cv::Mat R1_cv, R2_cv;
+  cv::Rodrigues(rvec1, R1_cv);
+  cv::Rodrigues(rvec2, R2_cv);
+
+  // 转换为Eigen矩阵
+  Eigen::Matrix3d R1 = utils::cvToEigen(R1_cv);
+  Eigen::Matrix3d R2 = utils::cvToEigen(R2_cv);
+
+  // 计算云台系下装甲板的RPY角
+  auto rpy1 = rvecToRPY(R1);
+  auto rpy2 = rvecToRPY(R2);
+
+  std::string coord_frame_name = (armor.type == ArmorType::SMALL ? "small" : "large");
+  double error1 =
+    pnp_solver_->calculateReprojectionError(armor.landmarks(), rvec1, tvec1, coord_frame_name);
+  double error2 =
+    pnp_solver_->calculateReprojectionError(armor.landmarks(), rvec2, tvec2, coord_frame_name);
+
+  // 两个解的重投影误差差距较大或者roll角度较大时，不做选择
+  if ((error2 / error1 > PROJECT_ERR_THRES) || (rpy1[0] * 180 / M_PI > 10)) {
+    armor.rmat = R1_cv;
+    armor.roll = rpy1[0] * 180 / M_PI;
+    armor.tvec = tvec1;
+    return;
   }
 
-  if (best_idx != 0) {
-    FYT_DEBUG("armor_detector", "PnP Solution Changed!");
-    rvec = rvecs[best_idx];
-    // Take average
-    tvec = std::accumulate(tvecs.begin(), tvecs.end(), cv::Mat::zeros(3, 1, CV_64F)) / tvecs.size();
-  }
-}
+  // 计算灯条在图像中的倾斜角度
+  double l_angle = std::atan2(armor.left_light.axis.y, armor.left_light.axis.x) * 180 / M_PI;
+  double r_angle = std::atan2(armor.right_light.axis.y, armor.right_light.axis.x) * 180 / M_PI;
+  double angle = (l_angle + r_angle) / 2;
+  angle += 90.0;
 
-double ArmorDetectorNode::rvecToRPY(const cv::Mat &rvec, int axis) const noexcept {
-  cv::Mat R;
-  cv::Rodrigues(rvec, R);
-  Eigen::Matrix3d eigen_R = utils::cvToEigen(R);
-  // Transform to imu frame
-  eigen_R = imu_to_camera_ * eigen_R;
-  Eigen::Quaterniond q(eigen_R);
-  // Get armor yaw
-  tf2::Quaternion tf_q(q.x(), q.y(), q.z(), q.w());
-  std::array<double, 3> rpy;
-  tf2::Matrix3x3(tf_q).getRPY(rpy[0], rpy[1], rpy[2]);
-  return rpy[axis];
+  // 根据倾斜角度学选择解
+  if ((angle > 0 && rpy1[2] > 0) || (angle < 0 && rpy1[2] < 0)) {
+    armor.rmat = R2_cv;
+    armor.roll = rpy2[0] * 180 / M_PI;
+    armor.tvec = tvec2;
+    FYT_DEBUG("armor_detector", "PnP Solution 2 Selected");
+  } else {
+    armor.rmat = R1_cv;
+    armor.roll = rpy1[0] * 180 / M_PI;
+    armor.tvec = tvec1;
+  }
 }
 
 rcl_interfaces::msg::SetParametersResult ArmorDetectorNode::onSetParameters(

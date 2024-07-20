@@ -39,7 +39,10 @@ Tracker::Tracker(double max_match_distance, double max_match_yaw_diff)
 , measurement(Eigen::VectorXd::Zero(4))
 , target_state(Eigen::VectorXd::Zero(9))
 , max_match_distance_(max_match_distance)
-, max_match_yaw_diff_(max_match_yaw_diff) {}
+, max_match_yaw_diff_(max_match_yaw_diff)
+, detect_count_(0)
+, lost_count_(0)
+, last_yaw_(0) {}
 
 void Tracker::init(const Armors::SharedPtr &armors_msg) noexcept {
   if (armors_msg->armors.empty()) {
@@ -189,12 +192,13 @@ void Tracker::initEKF(const Armor &a) noexcept {
   double yaw = orientationToYaw(a.pose.orientation);
 
   // Set initial position at 0.2m behind the target
-  target_state = Eigen::VectorXd::Zero(9);
+  target_state = Eigen::VectorXd::Zero(X_N);
   double r = 0.26;
   double xc = xa + r * cos(yaw);
   double yc = ya + r * sin(yaw);
-  dz = 0, another_r = r;
-  target_state << xc, 0, yc, 0, za, 0, yaw, 0, r;
+  double zc = za;
+  d_za = 0, d_zc = 0, another_r = r;
+  target_state << xc, 0, yc, 0, zc, 0, yaw, 0, r, d_zc;
 
   ekf->setState(target_state);
 }
@@ -208,9 +212,10 @@ void Tracker::handleArmorJump(const Armor &current_armor) noexcept {
     target_state(6) = yaw;
     // Only 4 armors has 2 radius and height
     if (tracked_armors_num == ArmorsNum::NORMAL_4) {
-      dz = target_state(4) - current_armor.pose.position.z;
-      target_state(4) = current_armor.pose.position.z;
+      d_za = target_state(4) + target_state(9) - current_armor.pose.position.z;
       std::swap(target_state(8), another_r);
+      d_zc = d_zc == 0 ? -d_za : 0;
+      target_state(9) = d_zc;
     }
     FYT_DEBUG("armor_solver", "Armor Jump!");
   }
@@ -223,13 +228,15 @@ void Tracker::handleArmorJump(const Armor &current_armor) noexcept {
     // If the distance between the current armor and the inferred armor is too
     // large, the state is wrong, reset center position and velocity in the
     // state
+    d_zc = 0;
     double r = target_state(8);
     target_state(0) = p.x + r * cos(yaw);  // xc
     target_state(1) = 0;                   // vxc
     target_state(2) = p.y + r * sin(yaw);  // yc
     target_state(3) = 0;                   // vyc
-    target_state(4) = p.z;                 // xz
-    target_state(5) = 0;                   // vza
+    target_state(4) = p.z;                 // zc
+    target_state(5) = 0;                   // vzc
+    target_state(9) = d_zc;                // d_zc
     FYT_WARN("armor_solver", "State wrong!");
   }
 
@@ -250,7 +257,7 @@ double Tracker::orientationToYaw(const geometry_msgs::msg::Quaternion &q) noexce
 
 Eigen::Vector3d Tracker::getArmorPositionFromState(const Eigen::VectorXd &x) noexcept {
   // Calculate predicted position of the current armor
-  double xc = x(0), yc = x(2), za = x(4);
+  double xc = x(0), yc = x(2), za = x(4) + x(9);
   double yaw = x(6), r = x(8);
   double xa = xc - r * cos(yaw);
   double ya = yc - r * sin(yaw);

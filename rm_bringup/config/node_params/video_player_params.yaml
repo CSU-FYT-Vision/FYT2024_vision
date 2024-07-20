@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     camera_info_url: package://rm_bringup/config/camera_info.yaml
-    path: "/home/zcf/csurm/csurm-RMUC2022/red.avi"
+    path: "/home/labor/Videos/blue.mp4"
     frame_rate: 30
     start_frame: 0
     frame_id: "camera_optical_frame"

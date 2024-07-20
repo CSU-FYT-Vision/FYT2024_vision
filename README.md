@@ -212,3 +212,5 @@ limitations under the License.
 - 增加了粒子滤波器，为状态估计提供新的选择
 - 修复了打符崩溃的问题（OpenVINO在推理时不能创建新的InferRequest，通过互斥锁解决）
 - 将自瞄解算修改为定时器回调，固定解算的频率
+- 增加手动补偿器ManualCompensator
+- 重写PnP选解逻辑

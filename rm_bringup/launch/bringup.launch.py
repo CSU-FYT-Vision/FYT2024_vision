@@ -92,15 +92,26 @@ def generate_launch_description():
     )
     
     # 装甲板解算
-    armor_solver_node = Node(
-        package='armor_solver',
-        executable='armor_solver_node',
-        name='armor_solver',
-        output='both',
-        emulate_tty=True,
-        parameters=[get_params('armor_solver')],
-        ros_arguments=[],
-    )
+    if launch_params['hero_solver']:
+        armor_solver_node = Node(
+            package='hero_armor_solver',
+            executable='hero_armor_solver_node',
+            name='armor_solver',
+            output='both',
+            emulate_tty=True,
+            parameters=[get_params('armor_solver')],
+            ros_arguments=[],
+        )
+    else:
+        armor_solver_node = Node(
+            package='armor_solver',
+            executable='armor_solver_node',
+            name='armor_solver',
+            output='both',
+            emulate_tty=True,
+            parameters=[get_params('armor_solver')],
+            ros_arguments=[],
+        )
 
     # 打符
     rune_detector_node = ComposableNode(    

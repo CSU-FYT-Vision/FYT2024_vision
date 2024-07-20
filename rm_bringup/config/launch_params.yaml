@@ -6,10 +6,12 @@ odom2camera:
 # 命名空间 所有节点、话题都会以这个命名空间开头，如/some_namespace/image_raw
 namespace: ''
 # true: 读取视频 false: 读取相机
-video_play: false 
+video_play: false
 # true: 虚拟下位机 false: 实车 
 virtual_serial: false 
+# true: 英雄解算 false: 传统解算
+hero_solver: false
 # true: 开启打符 false：关闭打符
-rune: false 
+rune: false
 # true: 启动导航tf false：不启动导航tf
 navigation: false

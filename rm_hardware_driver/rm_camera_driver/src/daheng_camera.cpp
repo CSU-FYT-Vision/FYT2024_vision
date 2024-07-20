@@ -122,7 +122,7 @@ DahengCameraNode::DahengCameraNode(const rclcpp::NodeOptions &options)
     std::string home = std::getenv("HOME");
 
     namespace fs = std::filesystem;
-    std::filesystem::path video_path = fs::path(home) / "/fyt2024-log/video/" /
+    std::filesystem::path video_path = fs::path(home) / "fyt2024-log/video/" /
                                        std::string(std::to_string(std::time(nullptr)) + ".avi");
 
     recorder_ = std::make_unique<Recorder>(

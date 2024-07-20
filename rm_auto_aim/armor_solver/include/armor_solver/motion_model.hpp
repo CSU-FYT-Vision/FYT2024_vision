@@ -29,7 +29,7 @@ enum class MotionModel {
 };
 
 // X_N: state dimension, Z_N: measurement dimension
-constexpr int X_N = 9, Z_N = 4;
+constexpr int X_N = 10, Z_N = 4;
 
 struct Predict {
   explicit Predict(double dt, MotionModel model = MotionModel::CONSTANT_VEL_ROT)
@@ -73,7 +73,7 @@ struct Measure {
   void operator()(const T x[Z_N], T z[Z_N]) {
     z[0] = x[0] - ceres::cos(x[6]) * x[8];
     z[1] = x[2] - ceres::sin(x[6]) * x[8];
-    z[2] = x[4];
+    z[2] = x[4] + x[9];
     z[3] = x[6];
   }
 };

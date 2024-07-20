@@ -37,18 +37,23 @@ float PnPSolver::calculateDistanceToCenter(const cv::Point2f &image_point) const
   return cv::norm(image_point - cv::Point2f(cx, cy));
 }
 
-Eigen::VectorXd PnPSolver::getPose(const cv::Mat &rvec, const cv::Mat &tvec) noexcept {
-  auto pose = Eigen::VectorXd(6);
-  cv::Mat rmat;
-  cv::Rodrigues(rvec, rmat);
-
-  float yaw, pitch, roll;
-  yaw = std::asin(-rmat.at<double>(2, 0));
-  pitch = std::atan2(rmat.at<double>(2, 1), rmat.at<double>(2, 2));
-  roll = std::atan2(rmat.at<double>(1, 0), rmat.at<double>(0, 0));
-
-  pose << tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2), yaw, pitch, -roll;
-  return pose;
+double PnPSolver::calculateReprojectionError(const std::vector<cv::Point2f> &image_points,
+                                             const cv::Mat &rvec,
+                                             const cv::Mat &tvec,
+                                             const std::string &coord_frame_name) const noexcept {
+  if (object_points_map_.find(coord_frame_name) != object_points_map_.end()) {
+    const auto &object_points = object_points_map_.at(coord_frame_name);
+    std::vector<cv::Point2f> reprojected_points;
+    cv::projectPoints(
+      object_points, rvec, tvec, camera_matrix_, distortion_coefficients_, reprojected_points);
+    double error = 0;
+    for (size_t i = 0; i < image_points.size(); ++i) {
+      error += cv::norm(image_points[i] - reprojected_points[i]);
+    }
+    return error;
+  } else {
+    return 0;
+  }
 }
 
 }  // namespace fyt

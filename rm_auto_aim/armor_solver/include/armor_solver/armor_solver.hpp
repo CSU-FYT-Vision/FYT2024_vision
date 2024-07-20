@@ -55,7 +55,8 @@ private:
                                                  const double yaw,
                                                  const double r1,
                                                  const double r2,
-                                                 const double dz,
+                                                 const double d_zc,
+                                                 const double d_za,
                                                  const size_t armors_num) const noexcept;
 
   // Select the best armor to shoot

@@ -39,6 +39,7 @@ add_library(${PROJECT_NAME} SHARED
   src/math/utils.cpp
   src/math/pnp_solver.cpp
   src/math/trajectory_compensator.cpp
+  src/math/manual_compensator.cpp
   src/math/extended_kalman_filter.cpp
   src/url_resolver.cpp
   src/heartbeat.cpp

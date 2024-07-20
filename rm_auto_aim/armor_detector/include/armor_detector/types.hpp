@@ -89,6 +89,9 @@ struct Light : public cv::RotatedRect {
     length = cv::norm(top - bottom);
     width = cv::norm(p[0] - p[1]);
 
+    axis = top - bottom;
+    axis = axis / cv::norm(axis);
+
     // Calculate the tilt angle
     // The angle is the angle between the light bar and the horizontal line
     tilt_angle = std::atan2(std::abs(top.x - bottom.x), std::abs(top.y - bottom.y));
@@ -96,6 +99,7 @@ struct Light : public cv::RotatedRect {
   }
   EnemyColor color;
   cv::Point2f top, bottom, center;
+  cv::Point2f axis;
   double length;
   double width;
   float tilt_angle;

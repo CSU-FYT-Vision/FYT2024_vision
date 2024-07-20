@@ -69,7 +69,10 @@ public:
   Eigen::VectorXd target_state;
 
   // To store another pair of armors message
-  double dz, another_r;
+  double d_za, another_r;
+
+  // To store offset relative to the reference plane
+  double d_zc;
 
 private:
   void initEKF(const Armor &a) noexcept;

@@ -44,7 +44,8 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
 
   // EKF
   // xa = x_armor, xc = x_robot_center
-  // state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r
+  // state: xc, v_xc, yc, v_yc, zc, v_zc, yaw, v_yaw, r, d_zc(new)
+  // state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r(old)
   // measurement: p, y, d, yaw
   // f - Process function
   auto f = Predict(0.005);
@@ -56,26 +57,31 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
   s2qz_ = declare_parameter("ekf.sigma2_q_z", 20.0);
   s2qyaw_ = declare_parameter("ekf.sigma2_q_yaw", 100.0);
   s2qr_ = declare_parameter("ekf.sigma2_q_r", 800.0);
+  s2qd_zc_ = declare_parameter("ekf.sigma2_q_d_zc", 800.0);
+
   auto u_q = [this]() {
     Eigen::Matrix<double, X_N, X_N> q;
-    double t = dt_, x = s2qx_, y = s2qy_, z = s2qz_, yaw = s2qyaw_, r = s2qr_;
+    double t = dt_, x = s2qx_, y = s2qy_, z = s2qz_, yaw = s2qyaw_, r = s2qr_, d_zc=s2qd_zc_;
     double q_x_x = pow(t, 4) / 4 * x, q_x_vx = pow(t, 3) / 2 * x, q_vx_vx = pow(t, 2) * x;
     double q_y_y = pow(t, 4) / 4 * y, q_y_vy = pow(t, 3) / 2 * y, q_vy_vy = pow(t, 2) * y;
     double q_z_z = pow(t, 4) / 4 * x, q_z_vz = pow(t, 3) / 2 * x, q_vz_vz = pow(t, 2) * z;
     double q_yaw_yaw = pow(t, 4) / 4 * yaw, q_yaw_vyaw = pow(t, 3) / 2 * x,
            q_vyaw_vyaw = pow(t, 2) * yaw;
     double q_r = pow(t, 4) / 4 * r;
+    double q_d_zc = pow(t, 4) / 4 * d_zc;
     // clang-format off
-    //    xc      v_xc    yc      v_yc    za      v_za    yaw         v_yaw       r
-    q <<  q_x_x,  q_x_vx, 0,      0,      0,      0,      0,          0,          0,
-          q_x_vx, q_vx_vx,0,      0,      0,      0,      0,          0,          0,
-          0,      0,      q_y_y,  q_y_vy, 0,      0,      0,          0,          0,
-          0,      0,      q_y_vy, q_vy_vy,0,      0,      0,          0,          0,
-          0,      0,      0,      0,      q_z_z,  q_z_vz, 0,          0,          0,
-          0,      0,      0,      0,      q_z_vz, q_vz_vz,0,          0,          0,
-          0,      0,      0,      0,      0,      0,      q_yaw_yaw,  q_yaw_vyaw, 0,
-          0,      0,      0,      0,      0,      0,      q_yaw_vyaw, q_vyaw_vyaw,0,
-          0,      0,      0,      0,      0,      0,      0,          0,          q_r;
+    //    xc      v_xc    yc      v_yc    zc      v_zc    yaw         v_yaw       r       d_za
+    q <<  q_x_x,  q_x_vx, 0,      0,      0,      0,      0,          0,          0,      0,
+          q_x_vx, q_vx_vx,0,      0,      0,      0,      0,          0,          0,      0,
+          0,      0,      q_y_y,  q_y_vy, 0,      0,      0,          0,          0,      0,
+          0,      0,      q_y_vy, q_vy_vy,0,      0,      0,          0,          0,      0,
+          0,      0,      0,      0,      q_z_z,  q_z_vz, 0,          0,          0,      0,
+          0,      0,      0,      0,      q_z_vz, q_vz_vz,0,          0,          0,      0,
+          0,      0,      0,      0,      0,      0,      q_yaw_yaw,  q_yaw_vyaw, 0,      0,
+          0,      0,      0,      0,      0,      0,      q_yaw_vyaw, q_vyaw_vyaw,0,      0,
+          0,      0,      0,      0,      0,      0,      0,          0,          q_r,    0,
+          0,      0,      0,      0,      0,      0,      0,          0,          0,      q_d_zc;
+
     // clang-format on
     return q;
   };
@@ -95,7 +101,7 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
     return r;
   };
   // P - error estimate covariance matrix
-  Eigen::DiagonalMatrix<double, 9> p0;
+  Eigen::DiagonalMatrix<double, X_N> p0;
   p0.setIdentity();
   tracker_->ekf = std::make_unique<RobotStateEKF>(f, h, u_q, u_r, p0);
 
@@ -131,14 +137,13 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
                                                                    rclcpp::SensorDataQoS());
   gimbal_pub_ = this->create_publisher<rm_interfaces::msg::GimbalCmd>("armor_solver/cmd_gimbal",
                                                                       rclcpp::SensorDataQoS());
-
-  int frequency = this->declare_parameter("frequency", 250);
-  auto timer_period = std::chrono::milliseconds(1000 / frequency);
-  pub_timer_ =
-    this->create_wall_timer(timer_period, std::bind(&ArmorSolverNode::timerCallback, this));
+  // Timer 250 Hz
+  pub_timer_ = this->create_wall_timer(std::chrono::milliseconds(4),
+                                       std::bind(&ArmorSolverNode::timerCallback, this));
   armor_target_.header.frame_id = "";
 
   // Enable/Disable Armor Solver
+  enable_ = true;
   set_mode_srv_ = this->create_service<rm_interfaces::srv::SetMode>(
     "armor_solver/set_mode",
     std::bind(
@@ -156,7 +161,7 @@ void ArmorSolverNode::timerCallback() {
   if (solver_ == nullptr) {
     return;
   }
-  
+
   if (!enable_) {
     return;
   }
@@ -281,6 +286,7 @@ void ArmorSolverNode::armorsCallback(const rm_interfaces::msg::Armors::SharedPtr
   target_msg.header.stamp = time;
   target_msg.header.frame_id = target_frame_;
 
+
   // Update tracker
   if (tracker_->tracker_state == Tracker::LOST) {
     tracker_->init(armors_msg);
@@ -320,7 +326,8 @@ void ArmorSolverNode::armorsCallback(const rm_interfaces::msg::Armors::SharedPtr
       target_msg.v_yaw = state(7);
       target_msg.radius_1 = state(8);
       target_msg.radius_2 = tracker_->another_r;
-      target_msg.dz = tracker_->dz;
+      target_msg.d_zc = state(9);
+      target_msg.d_za = tracker_->d_za;
     }
   }
 
@@ -344,13 +351,13 @@ void ArmorSolverNode::publishMarkers(const rm_interfaces::msg::Target &target_ms
 
   if (target_msg.tracking) {
     double yaw = target_msg.yaw, r1 = target_msg.radius_1, r2 = target_msg.radius_2;
-    double xc = target_msg.position.x, yc = target_msg.position.y, za = target_msg.position.z;
+    double xc = target_msg.position.x, yc = target_msg.position.y, zc = target_msg.position.z;
     double vx = target_msg.velocity.x, vy = target_msg.velocity.y, vz = target_msg.velocity.z;
-    double dz = target_msg.dz;
+    double d_za = target_msg.d_za, d_zc = target_msg.d_zc;
     position_marker_.action = visualization_msgs::msg::Marker::ADD;
     position_marker_.pose.position.x = xc;
     position_marker_.pose.position.y = yc;
-    position_marker_.pose.position.z = za + dz / 2;
+    position_marker_.pose.position.z = zc;
 
     linear_v_marker_.action = visualization_msgs::msg::Marker::ADD;
     linear_v_marker_.points.clear();
@@ -380,11 +387,11 @@ void ArmorSolverNode::publishMarkers(const rm_interfaces::msg::Target &target_ms
       // Only 4 armors has 2 radius and height
       if (a_n == 4) {
         r = is_current_pair ? r1 : r2;
-        p_a.z = za + (is_current_pair ? 0 : dz);
+        p_a.z = zc + d_zc +  (is_current_pair ? 0 : d_za);
         is_current_pair = !is_current_pair;
       } else {
         r = r1;
-        p_a.z = za;
+        p_a.z = zc;
       }
       p_a.x = xc - r * cos(tmp_yaw);
       p_a.y = yc - r * sin(tmp_yaw);
