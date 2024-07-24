@@ -214,4 +214,4 @@ limitations under the License.
 - 将自瞄解算修改为定时器回调，固定解算的频率
 - 增加手动补偿器ManualCompensator
 - 重写PnP选解逻辑
-- 修改了BA优化的代码，抽象出新的类ArmorPoseSolver
+- 修改了BA优化的代码，抽象出新的类ArmorPoseEstimator

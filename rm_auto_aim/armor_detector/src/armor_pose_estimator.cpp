@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "armor_detector/armor_pose_solver.hpp"
+#include "armor_detector/armor_pose_estimator.hpp"
 
 #include "armor_detector/types.hpp"
 #include "rm_utils/logger/log.hpp"
 #include "rm_utils/math/utils.hpp"
 
 namespace fyt::auto_aim {
-ArmorPoseSolver::ArmorPoseSolver(
+ArmorPoseEstimator::ArmorPoseEstimator(
     sensor_msgs::msg::CameraInfo::SharedPtr camera_info) {
   // Setup pnp solver
   pnp_solver_ = std::make_unique<PnPSolver>(camera_info->k, camera_info->d);
@@ -37,7 +37,7 @@ ArmorPoseSolver::ArmorPoseSolver(
 }
 
 std::vector<rm_interfaces::msg::Armor>
-ArmorPoseSolver::extractArmorPoses(const std::vector<Armor> &armors,
+ArmorPoseEstimator::extractArmorPoses(const std::vector<Armor> &armors,
                                    Eigen::Matrix3d R_imu_camera) {
   std::vector<rm_interfaces::msg::Armor> armors_msg;
 
@@ -94,7 +94,7 @@ ArmorPoseSolver::extractArmorPoses(const std::vector<Armor> &armors,
   return armors_msg;
 }
 
-Eigen::Vector3d ArmorPoseSolver::rotationMatrixToRPY(const Eigen::Matrix3d &R) {
+Eigen::Vector3d ArmorPoseEstimator::rotationMatrixToRPY(const Eigen::Matrix3d &R) {
   // Transform to camera frame
   Eigen::Quaterniond q(R);
   // Get armor yaw
@@ -104,7 +104,7 @@ Eigen::Vector3d ArmorPoseSolver::rotationMatrixToRPY(const Eigen::Matrix3d &R) {
   return rpy;
 }
 
-void ArmorPoseSolver::sortPnPResult(const Armor &armor,
+void ArmorPoseEstimator::sortPnPResult(const Armor &armor,
                                     std::vector<cv::Mat> &rvecs,
                                     std::vector<cv::Mat> &tvecs) const {
   constexpr float PROJECT_ERR_THRES = 3.0;

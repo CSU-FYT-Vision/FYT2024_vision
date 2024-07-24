@@ -66,19 +66,11 @@ TEST(ArmorDetectorNodeTest, NodeStartupTest) {
     return a.number < b.number;
   });
 
-  ASSERT_EQ(armors.size(), static_cast<size_t>(6));
-  ASSERT_EQ(armors[0].number, "2");
-  ASSERT_EQ(armors[1].number, "3");
-  ASSERT_EQ(armors[2].number, "4");
-  ASSERT_EQ(armors[3].number, "5");
-  ASSERT_EQ(armors[4].number, "outpost");
-  ASSERT_EQ(armors[5].number, "sentry");
-}
-
-int main(int argc, char **argv) {
-  testing::InitGoogleTest(&argc, argv);
-  rclcpp::init(argc, argv);
-  auto result = RUN_ALL_TESTS();
-  rclcpp::shutdown();
-  return result;
+  EXPECT_EQ(armors.size(), static_cast<size_t>(6));
+  EXPECT_EQ(armors[0].number, "2");
+  EXPECT_EQ(armors[1].number, "3");
+  EXPECT_EQ(armors[2].number, "4");
+  EXPECT_EQ(armors[3].number, "5");
+  EXPECT_EQ(armors[4].number, "outpost");
+  EXPECT_EQ(armors[5].number, "sentry");
 }

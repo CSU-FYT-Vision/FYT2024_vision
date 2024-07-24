@@ -65,19 +65,11 @@ TEST(RuneDetectorNodeTest, NodeStartupTest) {
   auto future = rune_detector->pushInput(test_image, 0);
   future.get();
 
-  ASSERT_EQ(runes.size(), static_cast<size_t>(3));
+  EXPECT_EQ(runes.size(), static_cast<size_t>(3));
   std::sort(runes.begin(), runes.end(), [](const RuneObject &a, const RuneObject &b) {
     return a.type < b.type;
   });
-  ASSERT_EQ(runes[0].type, RuneType::INACTIVATED);
-  ASSERT_EQ(runes[1].type, RuneType::ACTIVATED);
-  ASSERT_EQ(runes[2].type, RuneType::ACTIVATED);
-}
-
-int main(int argc, char **argv) {
-  testing::InitGoogleTest(&argc, argv);
-  rclcpp::init(argc, argv);
-  auto result = RUN_ALL_TESTS();
-  rclcpp::shutdown();
-  return result;
+  EXPECT_EQ(runes[0].type, RuneType::INACTIVATED);
+  EXPECT_EQ(runes[1].type, RuneType::ACTIVATED);
+  EXPECT_EQ(runes[2].type, RuneType::ACTIVATED);
 }

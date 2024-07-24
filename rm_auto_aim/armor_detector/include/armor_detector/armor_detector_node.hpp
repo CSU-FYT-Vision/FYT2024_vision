@@ -42,7 +42,7 @@
 #include <vector>
 // project
 #include "armor_detector/armor_detector.hpp"
-#include "armor_detector/armor_pose_solver.hpp"
+#include "armor_detector/armor_pose_estimator.hpp"
 #include "armor_detector/number_classifier.hpp"
 #include "rm_interfaces/msg/armors.hpp"
 #include "rm_interfaces/msg/target.hpp"
@@ -92,7 +92,7 @@ private:
 
   // Pose Solver
   bool use_ba_;
-  std::unique_ptr<ArmorPoseSolver> armor_pose_solver_;
+  std::unique_ptr<ArmorPoseEstimator> armor_pose_estimator_;
 
   // Detected armors publisher
   rm_interfaces::msg::Armors armors_msg_;

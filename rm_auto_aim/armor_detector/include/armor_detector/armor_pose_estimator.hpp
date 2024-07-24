@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ARMOR_POSE_SOLVER_HPP_
-#define ARMOR_POSE_SOLVER_HPP_
+#ifndef ARMOR_DETECTOR_ARMOR_POSE_ESTIMATOR_HPP_
+#define ARMOR_DETECTOR_ARMOR_POSE_ESTIMATOR_HPP_
 
 // std
 #include <array>
@@ -34,9 +34,9 @@
 #include "rm_utils/math/pnp_solver.hpp"
 
 namespace fyt::auto_aim {
-class ArmorPoseSolver {
+class ArmorPoseEstimator {
 public:
-  explicit ArmorPoseSolver(sensor_msgs::msg::CameraInfo::SharedPtr camera_info);
+  explicit ArmorPoseEstimator(sensor_msgs::msg::CameraInfo::SharedPtr camera_info);
 
   std::vector<rm_interfaces::msg::Armor> extractArmorPoses(const std::vector<Armor> &armors,
                                                Eigen::Matrix3d R_imu_camera);
@@ -59,4 +59,4 @@ private:
   std::unique_ptr<PnPSolver> pnp_solver_;
 };
 } // namespace fyt::auto_aim
-#endif // ARMOR_POSE_SOLVER_HPP_
+#endif // ARMOR_POSE_ESTIMATOR_HPP_

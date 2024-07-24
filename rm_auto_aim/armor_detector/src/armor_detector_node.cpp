@@ -118,8 +118,8 @@ ArmorDetectorNode::ArmorDetectorNode(const rclcpp::NodeOptions &options)
         cam_info_ =
             std::make_shared<sensor_msgs::msg::CameraInfo>(*camera_info);
         // Setup armor pose solver
-        armor_pose_solver_ = std::make_unique<ArmorPoseSolver>(cam_info_);
-        armor_pose_solver_->enableBA(use_ba_);
+        armor_pose_estimator_ = std::make_unique<ArmorPoseEstimator>(cam_info_);
+        armor_pose_estimator_->enableBA(use_ba_);
         cam_info_sub_.reset();
       });
 
@@ -178,9 +178,9 @@ void ArmorDetectorNode::imageCallback(
   armors_msg_.armors.clear();
 
   // Extract armor poses
-  if (armor_pose_solver_ != nullptr) {
+  if (armor_pose_estimator_ != nullptr) {
     armors_msg_.armors =
-        armor_pose_solver_->extractArmorPoses(armors, imu_to_camera_);
+        armor_pose_estimator_->extractArmorPoses(armors, imu_to_camera_);
 
     // std::string path =
     //   fmt::format("/home/zcf/fyt2024-log/images/{}/{}.jpg",
