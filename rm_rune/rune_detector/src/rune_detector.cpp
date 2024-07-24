@@ -29,20 +29,19 @@
 
 namespace fyt::rune {
 
-static constexpr int INPUT_W = 480;    // Width of input
-static constexpr int INPUT_H = 480;    // Height of input
-static constexpr int NUM_CLASSES = 2;  // Number of classes
-static constexpr int NUM_COLORS = 2;   // Number of color
+static constexpr int INPUT_W = 480;   // Width of input
+static constexpr int INPUT_H = 480;   // Height of input
+static constexpr int NUM_CLASSES = 2; // Number of classes
+static constexpr int NUM_COLORS = 2;  // Number of color
 static constexpr int NUM_POINTS = 5;
 static constexpr int NUM_POINTS_2 = 2 * NUM_POINTS;
 static constexpr float MERGE_CONF_ERROR = 0.15;
 static constexpr float MERGE_MIN_IOU = 0.9;
 // 由于训练失误，网络的颜色是反的
-static std::unordered_map<int, EnemyColor> DNN_COLOR_TO_ENEMY_COLOR = {{0, EnemyColor::BLUE},
-                                                                       {1, EnemyColor::RED}};
+static std::unordered_map<int, EnemyColor> DNN_COLOR_TO_ENEMY_COLOR = {
+    {0, EnemyColor::BLUE}, {1, EnemyColor::RED}};
 
-static cv::Mat letterbox(const cv::Mat &img,
-                         Eigen::Matrix3f &transform_matrix,
+static cv::Mat letterbox(const cv::Mat &img, Eigen::Matrix3f &transform_matrix,
                          std::vector<int> new_shape = {INPUT_W, INPUT_H}) {
   // Get current image shape [height, width]
 
@@ -50,7 +49,8 @@ static cv::Mat letterbox(const cv::Mat &img,
   int img_w = img.cols;
 
   // Compute scale ratio(new / old) and target resized shape
-  float scale = std::min(new_shape[1] * 1.0 / img_h, new_shape[0] * 1.0 / img_w);
+  float scale =
+      std::min(new_shape[1] * 1.0 / img_h, new_shape[0] * 1.0 / img_w);
   int resize_h = static_cast<int>(round(img_h * scale));
   int resize_w = static_cast<int>(round(img_w * scale));
 
@@ -84,14 +84,8 @@ static cv::Mat letterbox(const cv::Mat &img,
   /* clang-format on */
 
   // Add border
-  cv::copyMakeBorder(resized_img,
-                     resized_img,
-                     top,
-                     bottom,
-                     left,
-                     right,
-                     cv::BORDER_CONSTANT,
-                     cv::Scalar(114, 114, 114));
+  cv::copyMakeBorder(resized_img, resized_img, top, bottom, left, right,
+                     cv::BORDER_CONSTANT, cv::Scalar(114, 114, 114));
 
   return resized_img;
 }
@@ -101,8 +95,7 @@ static cv::Mat letterbox(const cv::Mat &img,
 // target_h: Height of input.
 // strides A vector of stride.
 // grid_strides Grid stride generated in this function
-static void generateGridsAndStride(const int target_w,
-                                   const int target_h,
+static void generateGridsAndStride(const int target_w, const int target_h,
                                    std::vector<int> &strides,
                                    std::vector<GridAndStride> &grid_strides) {
   for (auto stride : strides) {
@@ -118,13 +111,11 @@ static void generateGridsAndStride(const int target_w,
 }
 
 // Decode output tensor
-static void generateProposals(std::vector<RuneObject> &output_objs,
-                              std::vector<float> &scores,
-                              std::vector<cv::Rect> &rects,
-                              const cv::Mat &output_buffer,
-                              const Eigen::Matrix<float, 3, 3> &transform_matrix,
-                              float conf_threshold,
-                              std::vector<GridAndStride> grid_strides) {
+static void generateProposals(
+    std::vector<RuneObject> &output_objs, std::vector<float> &scores,
+    std::vector<cv::Rect> &rects, const cv::Mat &output_buffer,
+    const Eigen::Matrix<float, 3, 3> &transform_matrix, float conf_threshold,
+    std::vector<GridAndStride> grid_strides) {
   const int num_anchors = grid_strides.size();
 
   for (int anchor_idx = 0; anchor_idx < num_anchors; anchor_idx++) {
@@ -140,10 +131,12 @@ static void generateProposals(std::vector<RuneObject> &output_objs,
     double color_score, class_score;
     cv::Point color_id, class_id;
     cv::Mat color_scores =
-      output_buffer.row(anchor_idx).colRange(NUM_POINTS_2 + 1, NUM_POINTS_2 + 1 + NUM_COLORS);
+        output_buffer.row(anchor_idx)
+            .colRange(NUM_POINTS_2 + 1, NUM_POINTS_2 + 1 + NUM_COLORS);
     cv::Mat num_scores =
-      output_buffer.row(anchor_idx)
-        .colRange(NUM_POINTS_2 + 1 + NUM_COLORS, NUM_POINTS_2 + 1 + NUM_COLORS + NUM_CLASSES);
+        output_buffer.row(anchor_idx)
+            .colRange(NUM_POINTS_2 + 1 + NUM_COLORS,
+                      NUM_POINTS_2 + 1 + NUM_COLORS + NUM_CLASSES);
     // Argmax
     cv::minMaxLoc(color_scores, NULL, &color_score, NULL, &color_id);
     cv::minMaxLoc(num_scores, NULL, &class_score, NULL, &class_id);
@@ -240,16 +233,11 @@ static void nmsMergeSortedBboxes(std::vector<RuneObject> &faceobjects,
 }
 
 RuneDetector::RuneDetector(const std::filesystem::path &model_path,
-                           const std::string &device_name,
-                           float conf_threshold,
-                           int top_k,
-                           float nms_threshold,
-                           bool auto_init)
-: model_path_(model_path)
-, device_name_(device_name)
-, conf_threshold_(conf_threshold)
-, top_k_(top_k)
-, nms_threshold_(nms_threshold) {
+                           const std::string &device_name, float conf_threshold,
+                           int top_k, float nms_threshold, bool auto_init)
+    : model_path_(model_path), device_name_(device_name),
+      conf_threshold_(conf_threshold), top_k_(top_k),
+      nms_threshold_(nms_threshold) {
   if (auto_init) {
     init();
   }
@@ -266,41 +254,41 @@ void RuneDetector::init() {
   ov::preprocess::PrePostProcessor ppp(model);
   // Set input output precision
   auto elem_type = device_name_ == "GPU" ? ov::element::f16 : ov::element::f32;
-  auto perf_mode = device_name_ == "GPU"
-                     ? ov::hint::performance_mode(ov::hint::PerformanceMode::THROUGHPUT)
-                     : ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY);
+  auto perf_mode =
+      device_name_ == "GPU"
+          ? ov::hint::performance_mode(ov::hint::PerformanceMode::THROUGHPUT)
+          : ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY);
   ppp.input().tensor().set_element_type(elem_type);
   ppp.output().tensor().set_element_type(elem_type);
 
   // Compile model
-  compiled_model_ =
-    std::make_unique<ov::CompiledModel>(ov_core_->compile_model(model, device_name_, perf_mode));
+  compiled_model_ = std::make_unique<ov::CompiledModel>(
+      ov_core_->compile_model(model, device_name_, perf_mode));
 
   strides_ = {8, 16, 32};
   generateGridsAndStride(INPUT_W, INPUT_H, strides_, grid_strides_);
 }
 
-std::future<bool> RuneDetector::pushInput(const cv::Mat &rgb_img, int64_t timestamp_nanosec) {
+std::future<bool> RuneDetector::pushInput(const cv::Mat &rgb_img,
+                                          int64_t timestamp_nanosec) {
   if (rgb_img.empty()) {
     // return false when img is empty
     return std::async([]() { return false; });
   }
 
   // Reprocess
-  Eigen::Matrix3f transform_matrix;  // transform matrix from resized image to source image.
+  Eigen::Matrix3f
+      transform_matrix; // transform matrix from resized image to source image.
   cv::Mat resized_img = letterbox(rgb_img, transform_matrix);
 
   // Start async detect
-  return std::async(std::launch::async,
-                    &RuneDetector::processCallback,
-                    this,
-                    resized_img,
-                    transform_matrix,
-                    timestamp_nanosec,
-                    rgb_img);
+  return std::async(std::launch::async, &RuneDetector::processCallback, this,
+                    resized_img, transform_matrix, timestamp_nanosec, rgb_img);
 }
 
-void RuneDetector::setCallback(CallbackType callback) { infer_callback_ = callback; }
+void RuneDetector::setCallback(CallbackType callback) {
+  infer_callback_ = callback;
+}
 
 bool RuneDetector::processCallback(const cv::Mat resized_img,
                                    Eigen::Matrix3f transform_matrix,
@@ -308,22 +296,20 @@ bool RuneDetector::processCallback(const cv::Mat resized_img,
                                    const cv::Mat &src_img) {
   // BGR->RGB, u8(0-255)->f32(0.0-1.0), HWC->NCHW
   // note: TUP's model no need to normalize
-  cv::Mat blob =
-    cv::dnn::blobFromImage(resized_img, 1., cv::Size(INPUT_W, INPUT_H), cv::Scalar(0, 0, 0), true);
+  cv::Mat blob = cv::dnn::blobFromImage(
+      resized_img, 1., cv::Size(INPUT_W, INPUT_H), cv::Scalar(0, 0, 0), true);
 
   // Feed blob into input
   auto input_port = compiled_model_->input();
-  ov::Tensor input_tensor(input_port.get_element_type(),
-                          ov::Shape(std::vector<size_t>{1, 3, INPUT_W, INPUT_H}),
-                          blob.ptr(0));
+  ov::Tensor input_tensor(
+      input_port.get_element_type(),
+      ov::Shape(std::vector<size_t>{1, 3, INPUT_W, INPUT_H}), blob.ptr(0));
 
   // Start inference
   // Lock because of the thread race condition within the openvino library
   mtx_.lock();
   auto infer_request = compiled_model_->create_infer_request();
-  mtx_.unlock();
   infer_request.set_input_tensor(input_tensor);
-  mtx_.lock();
   infer_request.infer();
   mtx_.unlock();
 
@@ -332,7 +318,8 @@ bool RuneDetector::processCallback(const cv::Mat resized_img,
   // Process output data
   auto output_shape = output.get_shape();
   // 3549 x 21 Matrix
-  cv::Mat output_buffer(output_shape[1], output_shape[2], CV_32F, output.data());
+  cv::Mat output_buffer(output_shape[1], output_shape[2], CV_32F,
+                        output.data());
 
   // Parsed variable
   std::vector<RuneObject> objs_tmp, objs_result;
@@ -341,18 +328,13 @@ bool RuneDetector::processCallback(const cv::Mat resized_img,
   std::vector<int> indices;
 
   // Parse YOLO output
-  generateProposals(objs_tmp,
-                    scores,
-                    rects,
-                    output_buffer,
-                    transform_matrix,
-                    this->conf_threshold_,
-                    this->grid_strides_);
+  generateProposals(objs_tmp, scores, rects, output_buffer, transform_matrix,
+                    this->conf_threshold_, this->grid_strides_);
 
   // TopK
-  std::sort(objs_tmp.begin(), objs_tmp.end(), [](const RuneObject &a, const RuneObject &b) {
-    return a.prob > b.prob;
-  });
+  std::sort(
+      objs_tmp.begin(), objs_tmp.end(),
+      [](const RuneObject &a, const RuneObject &b) { return a.prob > b.prob; });
   if (objs_tmp.size() > static_cast<size_t>(this->top_k_)) {
     objs_tmp.resize(this->top_k_);
   }
@@ -363,9 +345,11 @@ bool RuneDetector::processCallback(const cv::Mat resized_img,
     objs_result.push_back(std::move(objs_tmp[indices[i]]));
 
     if (objs_result[i].pts.children.size() > 0) {
-      const float N = static_cast<float>(objs_result[i].pts.children.size() + 1);
+      const float N =
+          static_cast<float>(objs_result[i].pts.children.size() + 1);
       FeaturePoints pts_final = std::accumulate(
-        objs_result[i].pts.children.begin(), objs_result[i].pts.children.end(), objs_result[i].pts);
+          objs_result[i].pts.children.begin(),
+          objs_result[i].pts.children.end(), objs_result[i].pts);
       objs_result[i].pts = pts_final / N;
     }
   }
@@ -387,16 +371,16 @@ bool RuneDetector::processCallback(const cv::Mat resized_img,
   return false;
 }
 
-std::tuple<cv::Point2f, cv::Mat> RuneDetector::detectRTag(const cv::Mat &img,
-                                                          int binary_thresh,
-                                                          const cv::Point2f &prior) {
+std::tuple<cv::Point2f, cv::Mat>
+RuneDetector::detectRTag(const cv::Mat &img, int binary_thresh,
+                         const cv::Point2f &prior) {
   if (prior.x < 0 || prior.x > img.cols || prior.y < 0 || prior.y > img.rows) {
     return {prior, cv::Mat::zeros(cv::Size(200, 200), CV_8UC3)};
   }
 
   // Create ROI
-  cv::Rect roi =
-    cv::Rect(prior.x - 100, prior.y - 100, 200, 200) & cv::Rect(0, 0, img.cols, img.rows);
+  cv::Rect roi = cv::Rect(prior.x - 100, prior.y - 100, 200, 200) &
+                 cv::Rect(0, 0, img.cols, img.rows);
   const cv::Point2f prior_in_roi = prior - cv::Point2f(roi.tl());
 
   cv::Mat img_roi = img(roi);
@@ -405,19 +389,21 @@ std::tuple<cv::Point2f, cv::Mat> RuneDetector::detectRTag(const cv::Mat &img,
   cv::Mat gray_img;
   cv::cvtColor(img_roi, gray_img, cv::COLOR_BGR2GRAY);
   cv::Mat binary_img;
-  cv::threshold(gray_img, binary_img, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+  cv::threshold(gray_img, binary_img, 0, 255,
+                cv::THRESH_BINARY | cv::THRESH_OTSU);
   cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
   cv::dilate(binary_img, binary_img, kernel);
 
   // Find contours
   std::vector<std::vector<cv::Point>> contours;
-  cv::findContours(binary_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+  cv::findContours(binary_img, contours, cv::RETR_EXTERNAL,
+                   cv::CHAIN_APPROX_NONE);
 
-  auto it = std::find_if(contours.begin(),
-                         contours.end(),
-                         [p = prior_in_roi](const std::vector<cv::Point> &contour) -> bool {
-                           return cv::pointPolygonTest(contour, p, false) >= 0;
-                         });
+  auto it = std::find_if(
+      contours.begin(), contours.end(),
+      [p = prior_in_roi](const std::vector<cv::Point> &contour) -> bool {
+        return cv::boundingRect(contour).contains(p);
+      });
 
   // For visualization
   cv::cvtColor(binary_img, binary_img, cv::COLOR_GRAY2BGR);
@@ -426,17 +412,15 @@ std::tuple<cv::Point2f, cv::Mat> RuneDetector::detectRTag(const cv::Mat &img,
     return {prior, binary_img};
   }
 
-  cv::drawContours(binary_img, contours, it - contours.begin(), cv::Scalar(0, 255, 0), 2);
+  cv::drawContours(binary_img, contours, it - contours.begin(),
+                   cv::Scalar(0, 255, 0), 2);
 
-  cv::Point2f center = std::accumulate(it->begin(),
-                                       it->end(),
-                                       cv::Point2f(0, 0),
-                                       [n = static_cast<float>(it->size())](cv::Point2f a, auto b) {
-                                         return a + cv::Point2f(b.x, b.y) / n;
-                                       });
+  cv::Point2f center =
+      std::accumulate(it->begin(), it->end(), cv::Point(0, 0));
+  center /= static_cast<float>(it->size());
   center += cv::Point2f(roi.tl());
 
   return {center, binary_img};
 }
 
-}  // namespace fyt::rune
+} // namespace fyt::rune

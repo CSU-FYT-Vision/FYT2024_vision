@@ -17,11 +17,12 @@
 #include "armor_detector/ba_solver.hpp"
 // std
 #include <memory>
-// 3rd party
+// g2o
 #include <g2o/core/robust_kernel.h>
 #include <g2o/core/robust_kernel_factory.h>
 #include <g2o/core/robust_kernel_impl.h>
-
+#include <g2o/types/slam3d/types_slam3d.h>
+// 3rd party
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
 #include <sophus/se3.hpp>
@@ -35,88 +36,86 @@
 namespace fyt::auto_aim {
 G2O_USE_OPTIMIZATION_LIBRARY(dense)
 
-BaSolver::BaSolver(std::array<double, 9> &camera_matrix, std::vector<double> &dist_coeffs) {
-  cam_internal_k_ = CameraInternalK{
-    .fx = camera_matrix[0], .fy = camera_matrix[4], .cx = camera_matrix[2], .cy = camera_matrix[5]};
+BaSolver::BaSolver(std::array<double, 9> &camera_matrix,
+                   std::vector<double> &dist_coeffs) {
+  K_ = Eigen::Matrix3d::Identity();
+  K_(0, 0) = camera_matrix[0];
+  K_(1, 1) = camera_matrix[4];
+  K_(0, 2) = camera_matrix[2];
+  K_(1, 2) = camera_matrix[5];
 
   // Optimization information
   optimizer_.setVerbose(false);
   // Optimization method
   optimizer_.setAlgorithm(
-    g2o::OptimizationAlgorithmFactory::instance()->construct("lm_dense", solver_property_));
+      g2o::OptimizationAlgorithmFactory::instance()->construct(
+          "lm_dense", solver_property_));
   // Initial step size
   lm_algorithm_ = dynamic_cast<g2o::OptimizationAlgorithmLevenberg *>(
-    const_cast<g2o::OptimizationAlgorithm *>(optimizer_.algorithm()));
+      const_cast<g2o::OptimizationAlgorithm *>(optimizer_.algorithm()));
   lm_algorithm_->setUserLambdaInit(0.1);
 }
 
-bool BaSolver::solveBa(const std::deque<Armor> &armors, cv::Mat &rmat) noexcept {
-  if (armors.empty()) {
-    return true;
-  }
-
+Eigen::Matrix3d
+BaSolver::solveBa(const Armor &armor, const Eigen::Vector3d &t_camera_armor,
+                  const Eigen::Matrix3d &R_camera_armor,
+                  const Eigen::Matrix3d &R_imu_camera) noexcept {
   // Reset optimizer
   optimizer_.clear();
 
-  auto initial_armor_size = armors.front().type == ArmorType::SMALL
-                              ? Eigen::Vector2d(SMALL_ARMOR_WIDTH, SMALL_ARMOR_HEIGHT)
-                              : Eigen::Vector2d(LARGE_ARMOR_WIDTH, LARGE_ARMOR_HEIGHT);
+  // Essential coordinate system transformation
+  Eigen::Matrix3d R_imu_armor = R_imu_camera * R_camera_armor;
+  Sophus::SO3d R_camera_imu = Sophus::SO3d(R_imu_camera.transpose());
 
-  int optimized_frame_number = armors.size();
-  int id_counter = 0;
-  for (const auto &armor : armors) {
-    // Essential coordinate system transformation
-    Eigen::Matrix3d camera2armor = utils::cvToEigen(armor.rmat);
-    Eigen::Matrix3d imu2camera = armor.imu2camera;
-    Eigen::Matrix3d imu2armor = imu2camera * camera2armor;
-    Eigen::Matrix3d camera2imu = imu2camera.transpose();
+  // Compute the initial yaw from rotation matrix
+  double initial_armor_yaw;
+  auto theta_by_sin = std::asin(-R_imu_armor(0, 1));
+  auto theta_by_cos = std::acos(R_imu_armor(1, 1));
+  if (std::abs(theta_by_sin) > 1e-5) {
+    initial_armor_yaw = theta_by_sin > 0 ? theta_by_cos : -theta_by_cos;
+  } else {
+    initial_armor_yaw = R_imu_armor(1, 1) > 0 ? 0 : CV_PI;
+  }
 
-    // Compute the initial yaw from rotation matrix
-    Eigen::Vector<double, 1> initial_armor_yaw;
-    auto theta_by_sin = std::asin(-imu2armor(0, 1));
-    auto theta_by_cos = std::acos(imu2armor(1, 1));
-
-    double initial_armor_pitch =
+  // Get the pitch angle of the armor
+  double armor_pitch =
       armor.number == "outpost" ? -FIFTTEN_DEGREE_RAD : FIFTTEN_DEGREE_RAD;
+  Sophus::SO3d R_pitch = Sophus::SO3d::exp(Eigen::Vector3d(0, armor_pitch, 0));
 
-    if (std::abs(theta_by_sin) > 1e-5) {
-      initial_armor_yaw = Eigen::Vector<double, 1>(theta_by_sin > 0 ? theta_by_cos : -theta_by_cos);
-    } else {
-      initial_armor_yaw = Eigen::Vector<double, 1>(imu2armor(1, 1) > 0 ? 0 : CV_PI);
-    }
+  // Get the 3D points of the armor
+  const auto armor_size =
+      armor.type == ArmorType::SMALL
+          ? Eigen::Vector2d(SMALL_ARMOR_WIDTH, SMALL_ARMOR_HEIGHT)
+          : Eigen::Vector2d(LARGE_ARMOR_WIDTH, LARGE_ARMOR_HEIGHT);
+  const auto object_points =
+      Armor::buildObjectPoints<Eigen::Vector3d>(armor_size(0), armor_size(1));
 
-    auto armor_position_3d = utils::cvToEigen(armor.tvec);
+  // Fill the optimizer
+  size_t id_counter = 0;
 
-    Eigen::Matrix<double, Armor::N_LANDMARKS_2, 1> armor_landmarks_2d;
-    auto landmarks = armor.landmarks();
-    for (size_t i = 0; i < Armor::N_LANDMARKS; i++) {
-      armor_landmarks_2d(2 * i) = landmarks[i].x;
-      armor_landmarks_2d(2 * i + 1) = landmarks[i].y;
-    }
+  VertexYaw *v_yaw = new VertexYaw();
+  v_yaw->setId(id_counter++);
+  v_yaw->setEstimate(initial_armor_yaw);
+  optimizer_.addVertex(v_yaw);
 
-    VertexYaw *v_yaw = new VertexYaw();
-    v_yaw->setId(id_counter);
-    v_yaw->setEstimate(initial_armor_yaw);
-    optimizer_.addVertex(v_yaw);
+  const auto &landmarks = armor.landmarks();
+  for (size_t i = 0; i < Armor::N_LANDMARKS; i++) {
+    g2o::VertexPointXYZ *v_point = new g2o::VertexPointXYZ();
+    v_point->setId(id_counter++);
+    v_point->setEstimate(Eigen::Vector3d(
+        object_points[i].x(), object_points[i].y(), object_points[i].z()));
+    v_point->setFixed(true);
+    optimizer_.addVertex(v_point);
 
-    EdgeProjection *edge = new EdgeProjection(Sophus::SO3d(camera2imu),
-                                              armor_position_3d,
-                                              cam_internal_k_,
-                                              initial_armor_size,
-                                              initial_armor_pitch);
-    edge->setId(id_counter + optimized_frame_number);
+    EdgeProjection *edge =
+        new EdgeProjection(R_camera_imu, R_pitch, t_camera_armor, K_);
+    edge->setId(id_counter++);
     edge->setVertex(0, v_yaw);
-    edge->setMeasurement(armor_landmarks_2d);
+    edge->setVertex(1, v_point);
+    edge->setMeasurement(Eigen::Vector2d(landmarks[i].x, landmarks[i].y));
     edge->setInformation(EdgeProjection::InfoMatrixType::Identity());
-
-    // Kernel function selection : "Fair" "Huber"(and threshold value)
-    g2o::RobustKernel *robustKernel;
-    robustKernel = g2o::RobustKernelFactory::instance()->construct("Fair");
-    dynamic_cast<g2o::RobustKernelFair *>(robustKernel)->setDelta(2);
-    edge->setRobustKernel(robustKernel);
+    edge->setRobustKernel(new g2o::RobustKernelHuber);
     optimizer_.addEdge(edge);
-
-    id_counter++;
   }
 
   // Start optimizing
@@ -124,21 +123,15 @@ bool BaSolver::solveBa(const std::deque<Armor> &armors, cv::Mat &rmat) noexcept 
   optimizer_.optimize(20);
 
   // Get yaw angle after optimization
-  double yaw_optimized =
-    dynamic_cast<VertexYaw *>(optimizer_.vertex(id_counter - 1))->estimate()(0);
+  double yaw_optimized = v_yaw->estimate();
 
-  // Get rotation under the camera coordinate system
-  double pitch_optimized =
-    armors.back().number == "outpost" ? -FIFTTEN_DEGREE_RAD : FIFTTEN_DEGREE_RAD;
-  auto armor_euler_in_fixed_frame = Eigen::Vector3d(0, pitch_optimized, yaw_optimized);
-  Eigen::Matrix3d imu2armor =
-    utils::eulerToMatrix(armor_euler_in_fixed_frame, utils::EulerOrder::XYZ);
+  if (std::isnan(yaw_optimized)) {
+    FYT_ERROR("armor_detector", "Yaw angle is nan after optimization");
+    return R_camera_armor;
+  }
 
-  Eigen::Matrix3d rmat_optimized = armors.back().imu2camera.transpose() * imu2armor;
-
-  rmat = utils::eigenToCv(rmat_optimized);
-
-  return true;
+  Sophus::SO3d R_yaw = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, yaw_optimized));
+  return (R_camera_imu * R_pitch * R_yaw).matrix();
 }
 
-}  // namespace fyt::auto_aim
+} // namespace fyt::auto_aim

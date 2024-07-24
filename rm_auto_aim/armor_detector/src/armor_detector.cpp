@@ -29,8 +29,6 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-// third party
-#include <fmt/format.h>
 // project
 #include "armor_detector/types.hpp"
 #include "rm_utils/common.hpp"

@@ -44,8 +44,7 @@ ArmorSolverNode::ArmorSolverNode(const rclcpp::NodeOptions &options)
 
   // EKF
   // xa = x_armor, xc = x_robot_center
-  // state: xc, v_xc, yc, v_yc, zc, v_zc, yaw, v_yaw, r, d_zc(new)
-  // state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r(old)
+  // state: xc, v_xc, yc, v_yc, zc, v_zc, yaw, v_yaw, r, d_zc
   // measurement: p, y, d, yaw
   // f - Process function
   auto f = Predict(0.005);

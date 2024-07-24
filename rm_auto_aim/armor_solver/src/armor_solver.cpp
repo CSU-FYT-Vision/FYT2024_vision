@@ -43,6 +43,12 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n) : node_(n) {
   trajectory_compensator_->gravity = node->declare_parameter("solver.gravity", 9.8);
   trajectory_compensator_->resistance = node->declare_parameter("solver.resistance", 0.001);
 
+  manual_compensator_ = std::make_unique<ManualCompensator>();
+  auto angle_offset = node->declare_parameter("solver.angle_offset", std::vector<std::string>{});
+  if(!manual_compensator_->updateMapFlow(angle_offset)) {
+    FYT_WARN("armor_solver", "Manual compensator update failed!");
+  }
+
   state = State::TRACKING_ARMOR;
   overflow_count_ = 0;
   transfer_thresh_ = 5;
@@ -163,10 +169,19 @@ rm_interfaces::msg::GimbalCmd Solver::solve(const rm_interfaces::msg::Target &ta
       break;
     }
   }
-  gimbal_cmd.yaw = yaw * 180 / M_PI;
-  gimbal_cmd.pitch = pitch * 180 / M_PI;
-  gimbal_cmd.yaw_diff = (yaw - rpy_[2]) * 180 / M_PI;
-  gimbal_cmd.pitch_diff = (pitch - rpy_[1]) * 180 / M_PI;
+
+  // Compensate angle by angle_offset_map
+  auto angle_offset = manual_compensator_->angleHardCorrect(target_position.head(2).norm(), target_position.z());
+  double pitch_offset = angle_offset[0] * M_PI / 180;
+  double yaw_offset = angle_offset[1] * M_PI / 180;
+  double cmd_pitch = pitch + pitch_offset;
+  double cmd_yaw = angles::normalize_angle(yaw + yaw_offset);
+
+
+  gimbal_cmd.yaw = cmd_yaw * 180 / M_PI;
+  gimbal_cmd.pitch = cmd_pitch * 180 / M_PI;  
+  gimbal_cmd.yaw_diff = (cmd_yaw - rpy_[2]) * 180 / M_PI;
+  gimbal_cmd.pitch_diff = (cmd_pitch - rpy_[1]) * 180 / M_PI;
 
   if (gimbal_cmd.fire_advice) {
     FYT_DEBUG("armor_solver", "You Need Fire!");

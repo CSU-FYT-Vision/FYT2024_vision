@@ -17,19 +17,20 @@
 namespace fyt {
 bool ManualCompensator::updateMap(const LineRegion& d_region,
                                   const LineRegion& h_region,
-                                  const double pitch_offset) {
+                                  const double pitch_offset,
+                                  const double yaw_offset) {
     auto target_dist_node = 
-      std::find_if(pitch_offset_map_.begin(), 
-                   pitch_offset_map_.end(),
+      std::find_if(angle_offset_map_.begin(), 
+                   angle_offset_map_.end(),
                    [&](const DistMapNode& dist_node) {
      return dist_node.dist_region.checkIntersection(d_region); 
     });
 
-    if (target_dist_node == pitch_offset_map_.end()) {
-      HeightMapNode height_node(h_region, pitch_offset);
+    if (target_dist_node == angle_offset_map_.end()) {
+      HeightMapNode height_node(h_region, pitch_offset, yaw_offset);
       std::vector<HeightMapNode> h_nodes{height_node};
       DistMapNode dist_node(d_region, h_nodes);
-      pitch_offset_map_.emplace_back(dist_node);
+      angle_offset_map_.emplace_back(dist_node);
     } else {
       auto target_height_node = 
         std::find_if(target_dist_node->height_map.begin(),
@@ -39,7 +40,7 @@ bool ManualCompensator::updateMap(const LineRegion& d_region,
       });
 
       if (target_height_node == target_dist_node->height_map.end()) {
-        HeightMapNode height_node(h_region, pitch_offset);
+        HeightMapNode height_node(h_region, pitch_offset, yaw_offset);
         target_dist_node->height_map.emplace_back(height_node);
       } else {
         return false;
@@ -48,16 +49,16 @@ bool ManualCompensator::updateMap(const LineRegion& d_region,
     return true;
   }
 
-double ManualCompensator::pitchHardCorrect(const double dist, 
+std::vector<double> ManualCompensator::angleHardCorrect(const double dist, 
                                            const double height) {
   auto target_dist_node = 
-    std::find_if(pitch_offset_map_.begin(), 
-                  pitch_offset_map_.end(),
+    std::find_if(angle_offset_map_.begin(), 
+                  angle_offset_map_.end(),
                   [&](const DistMapNode& dist_node) {
     return dist_node.dist_region.checkPoint(dist); 
   });
 
-  if (target_dist_node != pitch_offset_map_.end()) {
+  if (target_dist_node != angle_offset_map_.end()) {
     auto target_height_node = 
       std::find_if(target_dist_node->height_map.begin(),
                     target_dist_node->height_map.end(),
@@ -66,10 +67,10 @@ double ManualCompensator::pitchHardCorrect(const double dist,
     });
 
     if (target_height_node != target_dist_node->height_map.end()) {
-      return target_height_node->pitch_offset;    
+      return {target_height_node->pitch_offset, target_height_node->yaw_offset};    
     }
   }
-  return 0.0;
+  return {0.0, 0.0};
 } 
   
 bool ManualCompensator::parseStr(const std::string& str, 
@@ -96,9 +97,9 @@ bool ManualCompensator::updateMapByStr(const std::string &str) {
 
   LineRegion d_region(nums[0], nums[1]);
   LineRegion h_region(nums[2], nums[3]);
-  if (!updateMap(d_region, h_region, nums[4])) {
+  if (!updateMap(d_region, h_region, nums[4], nums[5])) {
     return false;
   }
   return true;
 }
-}
+}  // namespace fyt

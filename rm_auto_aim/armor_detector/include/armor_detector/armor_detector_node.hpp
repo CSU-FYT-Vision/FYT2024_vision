@@ -1,6 +1,7 @@
 // Copyright Chen Jun 2023. Licensed under the MIT License.
 //
-// Additional modifications and features by Chengfu Zou, Labor. Licensed under Apache License 2.0.
+// Additional modifications and features by Chengfu Zou, Labor. Licensed under
+// Apache License 2.0.
 //
 // Copyright (C) FYT Vision Group. All rights reserved.
 //
@@ -41,53 +42,57 @@
 #include <vector>
 // project
 #include "armor_detector/armor_detector.hpp"
-#include "armor_detector/ba_solver.hpp"
+#include "armor_detector/armor_pose_solver.hpp"
 #include "armor_detector/number_classifier.hpp"
 #include "rm_interfaces/msg/armors.hpp"
 #include "rm_interfaces/msg/target.hpp"
 #include "rm_interfaces/srv/set_mode.hpp"
 #include "rm_utils/heartbeat.hpp"
 #include "rm_utils/logger/log.hpp"
-#include "rm_utils/math/pnp_solver.hpp"
 
 namespace fyt::auto_aim {
 
 // Armor Detector Node
-// Subscribe to the image topic, run the armor detection alogorithm and publish the detected armors
+// Subscribe to the image topic, run the armor detection alogorithm and publish
+// the detected armors
 class ArmorDetectorNode : public rclcpp::Node {
 public:
   ArmorDetectorNode(const rclcpp::NodeOptions &options);
 
 private:
   void imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr img_msg);
-  // void targetCallback(const rm_interfaces::msg::Target::SharedPtr target_msg);
+  // void targetCallback(const rm_interfaces::msg::Target::SharedPtr
+  // target_msg);
 
   std::unique_ptr<Detector> initDetector();
-  std::vector<Armor> detectArmors(const sensor_msgs::msg::Image::ConstSharedPtr &img_msg);
 
-  // Select the best PnP solution according to the pitch angle
-  void PnPSolutionsSelection(Armor &armor,
-                             const std::vector<cv::Mat> &rvecs,
-                             const std::vector<cv::Mat> &tvecs) noexcept;
+  std::vector<Armor>
+  detectArmors(const sensor_msgs::msg::Image::ConstSharedPtr &img_msg);
 
   void createDebugPublishers() noexcept;
   void destroyDebugPublishers() noexcept;
 
   void publishMarkers() noexcept;
 
-  void setModeCallback(const std::shared_ptr<rm_interfaces::srv::SetMode::Request> request,
-                       std::shared_ptr<rm_interfaces::srv::SetMode::Response> response);
+  void setModeCallback(
+      const std::shared_ptr<rm_interfaces::srv::SetMode::Request> request,
+      std::shared_ptr<rm_interfaces::srv::SetMode::Response> response);
 
   // Dynamic Parameter
-  rcl_interfaces::msg::SetParametersResult onSetParameters(
-    std::vector<rclcpp::Parameter> parameters);
-  rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr on_set_parameters_callback_handle_;
+  rcl_interfaces::msg::SetParametersResult
+  onSetParameters(std::vector<rclcpp::Parameter> parameters);
+  rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
+      on_set_parameters_callback_handle_;
 
   // Heartbeat
   HeartBeatPublisher::SharedPtr heartbeat_;
 
   // Armor Detector
   std::unique_ptr<Detector> detector_;
+
+  // Pose Solver
+  bool use_ba_;
+  std::unique_ptr<ArmorPoseSolver> armor_pose_solver_;
 
   // Detected armors publisher
   rm_interfaces::msg::Armors armors_msg_;
@@ -97,14 +102,13 @@ private:
   visualization_msgs::msg::Marker armor_marker_;
   visualization_msgs::msg::Marker text_marker_;
   visualization_msgs::msg::MarkerArray marker_array_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+      marker_pub_;
 
   // Camera info part
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_info_sub_;
   cv::Point2f cam_center_;
   std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_;
-  std::unique_ptr<PnPSolver> pnp_solver_;
-  std::unique_ptr<BaSolver> ba_solver_;
 
   // Image subscription
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr img_sub_;
@@ -117,26 +121,25 @@ private:
   // ReceiveData subscripiton
   std::string odom_frame_;
   Eigen::Matrix3d imu_to_camera_;
-  Eigen::Matrix3d gimbal_to_camera_;
   std::shared_ptr<tf2_ros::Buffer> tf2_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf2_listener_;
-  geometry_msgs::msg::TransformStamped odom_to_gimbal;
 
   // Enable/Disable Armor Detector
   rclcpp::Service<rm_interfaces::srv::SetMode>::SharedPtr set_mode_srv_;
-  bool use_ba_;
 
   // Debug information
   bool debug_;
   std::shared_ptr<rclcpp::ParameterEventHandler> debug_param_sub_;
   std::shared_ptr<rclcpp::ParameterCallbackHandle> debug_cb_handle_;
-  rclcpp::Publisher<rm_interfaces::msg::DebugLights>::SharedPtr lights_data_pub_;
-  rclcpp::Publisher<rm_interfaces::msg::DebugArmors>::SharedPtr armors_data_pub_;
+  rclcpp::Publisher<rm_interfaces::msg::DebugLights>::SharedPtr
+      lights_data_pub_;
+  rclcpp::Publisher<rm_interfaces::msg::DebugArmors>::SharedPtr
+      armors_data_pub_;
   image_transport::Publisher binary_img_pub_;
   image_transport::Publisher number_img_pub_;
   image_transport::Publisher result_img_pub_;
 };
 
-}  // namespace fyt::auto_aim
+} // namespace fyt::auto_aim
 
-#endif  // ARMOR_DETECTOR_DETECTOR_NODE_HPP_
+#endif // ARMOR_DETECTOR_DETECTOR_NODE_HPP_

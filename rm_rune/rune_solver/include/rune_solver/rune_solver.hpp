@@ -42,6 +42,7 @@
 #include "rm_utils/math/extended_kalman_filter.hpp"
 #include "rm_utils/math/pnp_solver.hpp"
 #include "rm_utils/math/trajectory_compensator.hpp"
+#include "rm_utils/math/manual_compensator.hpp"
 #include "rune_solver/curve_fitter.hpp"
 #include "rune_solver/motion_model.hpp"
 #include "rune_solver/motion_model.hpp"
@@ -102,6 +103,7 @@ public:
   std::unique_ptr<TrajectoryCompensator> trajectory_compensator;
   std::unique_ptr<CurveFitter> curve_fitter;
   std::unique_ptr<RuneCenterEKF> ekf;
+  std::unique_ptr<ManualCompensator> manual_compensator;
 
   RuneSolverParams rune_solver_params;
 

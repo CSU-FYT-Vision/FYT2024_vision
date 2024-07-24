@@ -55,16 +55,6 @@ inline std::string armorTypeToString(const ArmorType &type) {
   }
 }
 
-// Struct used to store the camera internal parameters
-struct CameraInternalK {
-  Eigen::Matrix3d toMatrix() const noexcept {
-    Eigen::Matrix3d K;
-    K << fx, 0, cx, 0, fy, cy, 0, 0, 1;
-    return K;
-  }
-  double fx, fy, cx, cy;
-};
-
 // Struct used to store the light bar
 struct Light : public cv::RotatedRect {
   Light() = default;
@@ -153,12 +143,6 @@ struct Armor {
               right_light.bottom};
     }
   }
-
-  // Armor pose part
-  cv::Mat rmat;
-  cv::Mat tvec;
-  double roll;
-  Eigen::Matrix3d imu2camera;
 
   // Light pairs part
   Light left_light, right_light;

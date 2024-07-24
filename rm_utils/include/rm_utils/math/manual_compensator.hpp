@@ -21,7 +21,7 @@
 #include <sstream>
 
 namespace fyt {
-  constexpr size_t NORMAL_STR_NUM = 5;
+  constexpr size_t NORMAL_STR_NUM = 6;
 
   class LineRegion{
     public:
@@ -51,10 +51,11 @@ namespace fyt {
   class ManualCompensator {
     public:
       struct HeightMapNode {
-        HeightMapNode(const LineRegion &region,  const double pitch): 
-        height_region(region), pitch_offset(pitch) {}
+        HeightMapNode(const LineRegion &region,  const double pitch, const double yaw): 
+        height_region(region), pitch_offset(pitch), yaw_offset(yaw) {}
         LineRegion height_region;
         double pitch_offset;
+        double yaw_offset;
       };
 
       struct DistMapNode {
@@ -66,11 +67,12 @@ namespace fyt {
 
       ManualCompensator() = default;
 
-      double pitchHardCorrect(const double dist, const double height);
+      std::vector<double> angleHardCorrect(const double dist, const double height);
 
       bool updateMap(const LineRegion& d_region,
                      const LineRegion& h_region,
-                     const double pitch_offset);
+                     const double pitch_offset,
+                     const double yaw_offset);
 
       bool updateMapByStr(const std::string& str);
 
@@ -86,7 +88,7 @@ namespace fyt {
     private:
       bool parseStr(const std::string& str, std::vector<double>& nums); 
 
-      std::vector<DistMapNode> pitch_offset_map_;
+      std::vector<DistMapNode> angle_offset_map_;
   };
-}
+}  // namespace fyt
 #endif

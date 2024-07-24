@@ -45,6 +45,7 @@ RuneSolver::RuneSolver(const RuneSolverParams &rsp, std::shared_ptr<tf2_ros::Buf
   trajectory_compensator->velocity = rsp.bullet_speed;
   trajectory_compensator->resistance = 0.01;
   ekf_state_ = Eigen::Vector4d::Zero();
+  manual_compensator = std::make_unique<ManualCompensator>();
 }
 
 double RuneSolver::init(const rm_interfaces::msg::RuneTarget::SharedPtr received_target) {
@@ -264,11 +265,18 @@ rm_interfaces::msg::GimbalCmd RuneSolver::solveGimbalCmd(const Eigen::Vector3d &
   }
   double distance = target.norm();
 
+  // Compensate angle by angle_offset_map
+  auto angle_offset = manual_compensator->angleHardCorrect(target.head(2).norm(), target.z());
+  double pitch_offset = angle_offset[0] * M_PI / 180;
+  double yaw_offset = angle_offset[1] * M_PI / 180;
+  double cmd_pitch = pitch + pitch_offset;
+  double cmd_yaw = angles::normalize_angle(yaw + yaw_offset);
+
   rm_interfaces::msg::GimbalCmd gimbal_cmd;
-  gimbal_cmd.yaw = yaw * 180 / M_PI;
-  gimbal_cmd.pitch = pitch * 180 / M_PI;
-  gimbal_cmd.yaw_diff = (yaw - current_yaw) * 180 / M_PI;
-  gimbal_cmd.pitch_diff = (pitch - current_pitch) * 180 / M_PI;
+  gimbal_cmd.yaw = cmd_yaw * 180 / M_PI;
+  gimbal_cmd.pitch = cmd_pitch * 180 / M_PI;
+  gimbal_cmd.yaw_diff = (cmd_yaw - current_yaw) * 180 / M_PI;
+  gimbal_cmd.pitch_diff = (cmd_pitch - current_pitch) * 180 / M_PI;
   gimbal_cmd.distance = distance;
 
   // Judge whether to shoot

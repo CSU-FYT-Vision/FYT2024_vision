@@ -46,18 +46,21 @@ namespace fyt::auto_aim {
 // the Yaw angle)
 class BaSolver {
 public:
-  BaSolver(std::array<double, 9> &camera_matrix, std::vector<double> &dist_coeffs);
+  BaSolver(std::array<double, 9> &camera_matrix,
+           std::vector<double> &dist_coeffs);
 
-  // Solve the armor pose using the BA algorithm, need the result of PnP
-  bool solveBa(const std::deque<Armor> &armors, cv::Mat &rmat) noexcept;
+  // Solve the armor pose using the BA algorithm, return the optimized rotation
+  Eigen::Matrix3d solveBa(const Armor &armor,
+                          const Eigen::Vector3d &t_camera_armor,
+                          const Eigen::Matrix3d &R_camera_armor,
+                          const Eigen::Matrix3d &R_imu_camera) noexcept;
 
 private:
-  CameraInternalK cam_internal_k_;
-
+  Eigen::Matrix3d K_;
   g2o::SparseOptimizer optimizer_;
   g2o::OptimizationAlgorithmProperty solver_property_;
   g2o::OptimizationAlgorithmLevenberg *lm_algorithm_;
 };
 
-}  // namespace fyt::auto_aim
+} // namespace fyt::auto_aim
 #endif // ARMOR_DETECTOR_BAS_SOLVER_HPP_

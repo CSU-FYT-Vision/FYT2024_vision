@@ -51,6 +51,7 @@ g2o_core
 g2o_stuff
 g2o_solver_csparse
 g2o_types_sba
+g2o_types_slam3d
 g2o_solver_dense
 fmt::fmt
 tbb

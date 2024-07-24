@@ -14,8 +14,6 @@
 // limitations under the License.
 
 #include "rune_solver/rune_solver_node.hpp"
-// std
-#include <chrono>
 // ros2
 #include <cv_bridge/cv_bridge.h>
 #include <rmw/qos_profiles.h>
@@ -52,6 +50,10 @@ RuneSolverNode::RuneSolverNode(const rclcpp::NodeOptions &options) : Node("rune_
     .auto_type_determined = declare_parameter("auto_type_determined", true),
   };
   rune_solver_ = std::make_unique<RuneSolver>(rune_solver_params, tf2_buffer_);
+  
+  // Init manual compensator
+  auto angle_offset = declare_parameter("angle_offset", std::vector<std::string>{});
+  rune_solver_->manual_compensator->updateMapFlow(angle_offset);
 
   // EKF for filtering the position of R tag
   // state: x, y, z, yaw
@@ -151,12 +153,9 @@ RuneSolverNode::RuneSolverNode(const rclcpp::NodeOptions &options) : Node("rune_
       "rune_solver/marker", rclcpp::SensorDataQoS());
   }
   last_rune_target_.header.frame_id = "";
-
   // Timer 250 Hz
-  int frequency = 250;
-  auto timer_period = std::chrono::milliseconds(1000 / frequency);
-  pub_timer_ =
-    this->create_wall_timer(timer_period, std::bind(&RuneSolverNode::timerCallback, this));
+  pub_timer_ = this->create_wall_timer(std::chrono::milliseconds(4),
+                                       std::bind(&RuneSolverNode::timerCallback, this));
 
   // Heartbeat
   heartbeat_ = HeartBeatPublisher::create(this);

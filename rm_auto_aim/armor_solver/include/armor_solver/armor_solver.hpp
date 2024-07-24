@@ -21,6 +21,7 @@
 #include <memory>
 // ros2
 #include <tf2_ros/buffer.h>
+#include <angles/angles.h>
 
 #include <rclcpp/time.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -30,6 +31,7 @@
 #include "rm_interfaces/msg/gimbal_cmd.hpp"
 #include "rm_interfaces/msg/target.hpp"
 #include "rm_utils/math/trajectory_compensator.hpp"
+#include "rm_utils/math/manual_compensator.hpp"
 
 namespace fyt::auto_aim {
 // Solver class used to solve the gimbal command from tracked target
@@ -79,6 +81,7 @@ private:
                   const double distance) const noexcept;
 
   std::unique_ptr<TrajectoryCompensator> trajectory_compensator_;
+  std::unique_ptr<ManualCompensator> manual_compensator_;
 
   std::array<double, 3> rpy_;
 
