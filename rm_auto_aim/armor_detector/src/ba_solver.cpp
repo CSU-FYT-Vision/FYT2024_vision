@@ -131,7 +131,7 @@ BaSolver::solveBa(const Armor &armor, const Eigen::Vector3d &t_camera_armor,
   }
 
   Sophus::SO3d R_yaw = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, yaw_optimized));
-  return (R_camera_imu * R_pitch * R_yaw).matrix();
+  return (R_camera_imu * R_yaw * R_pitch).matrix();
 }
 
 } // namespace fyt::auto_aim

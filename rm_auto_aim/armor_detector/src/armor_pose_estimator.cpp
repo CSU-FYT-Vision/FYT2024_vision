@@ -150,6 +150,8 @@ void ArmorPoseEstimator::sortPnPResult(const Armor &armor,
   double angle = (l_angle + r_angle) / 2;
   angle += 90.0;
 
+  if (armor.number == "outpost") angle = -angle;
+
   // 根据倾斜角度选择解
   // 如果装甲板左倾（angle > 0），选择Yaw为负的解
   // 如果装甲板右倾（angle < 0），选择Yaw为正的解
